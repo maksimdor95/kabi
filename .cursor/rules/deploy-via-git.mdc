@@ -1,0 +1,28 @@
+---
+description: Деплой на стенд только через Git (push → pull), не rsync из грязного дерева
+alwaysApply: true
+---
+
+# Деплой: сначала Git, потом стенд
+
+## Порядок
+
+1. Закоммитить и **запушить** в `https://github.com/maksimdor95/kabi.git`
+2. На ВМ: `git pull` (или `scripts/deploy_git.sh`)
+3. При необходимости: `pip install -e .`, `systemctl restart kabi-bot`
+
+## Запрещено
+
+- Катить на стенд **незакоммиченные** / **не запушенные** изменения (`rsync` с Mac в обход Git)
+- Копировать `.env` в Git или в публичный чат
+- Деплоить с машины разработки, пока локальный бот с тем же `TELEGRAM_BOT_TOKEN` ещё polling (конфликт)
+
+## Исключения
+
+- Аварийный hotfix на ВМ → сразу **backport** коммитом в Git в том же сеансе
+- Первый bootstrap ВМ (Docker/DNS) — ок; код после bootstrap только из Git
+
+## Скрипты
+
+- Обновить стенд: `./scripts/deploy_git.sh user1@HOST`
+- Первичная настройка ВМ: `scripts/server_setup.sh` (на сервере)

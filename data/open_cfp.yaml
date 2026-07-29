@@ -1,0 +1,35 @@
+# M5 bootstrap: известные CFP-URL для монитора.
+# M6 discovery сам находит CFP (PaperCall и др.) — этот файл не обязанность пользователя.
+# Добавляй сюда только если хочешь форсировать мониторинг конкретной страницы.
+
+sources:
+  - id: productsense-2026
+    name: ProductSense
+    cfp_url: https://productsense.io/submit
+    url: https://productsense.io/
+    location: "Москва / online"
+    topics: [product management, CPO, growth, продукт, AI в продукте]
+
+  - id: productcamp-2026
+    name: ProductCamp
+    cfp_url: https://productcamp.ru/summer2026
+    url: https://productcamp.ru/
+    location: "Переславль-Залесский / online"
+    topics: [product, продукт, кейсы]
+
+  - id: infostart-apm-2026
+    name: INFOSTART A&PM EVENT
+    cfp_url: https://infostart.ru/event/apm2026/
+    url: https://infostart.ru/event/apm2026/
+    location: "Санкт-Петербург"
+    topics: [product owner, аналитика, управление проектами, продукт, IT]
+
+  - id: epic-growth-watch
+    name: Epic Growth Conf
+    # Пока нет отдельной страницы заявки — мониторим главную на появление CFP.
+    # is_actionable_cfp_url=false → коннектор пропустит, пока не дадим путь /cfp|/submit.
+    cfp_url: https://egconf.io/
+    url: https://egconf.io/
+    location: "Москва / online"
+    topics: [growth, продукт, метрики, маркетинг]
+    watch_only: true

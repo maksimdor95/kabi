@@ -1,0 +1,110 @@
+# Карьерные сайты компаний (M7c). Публичный HTML/JSON, без логина.
+# kind:
+#   yandex_api — JSON https://yandex.ru/jobs/api/publications
+#   html_list  — листинг HTML; path_regex / path_exclude уточняют ссылки
+
+sites:
+  - id: yandex
+    name: Яндекс
+    kind: yandex_api
+    enabled: true
+    list_url: https://yandex.ru/jobs/api/publications
+    vacancy_url_template: https://yandex.ru/jobs/vacancies/{slug}
+
+  - id: sber
+    name: Сбер
+    kind: html_list
+    # SPA без вакансий в SSR — оставляем выкл. до появления стабильного API.
+    enabled: false
+    list_url: https://rabota.sber.ru/search/?query=%D0%BF%D1%80%D0%BE%D0%B4%D1%83%D0%BA%D1%82
+    link_contains:
+      - /vacancy
+      - /vacancies
+
+  - id: tbank
+    name: Т-Банк
+    kind: html_list
+    enabled: true
+    list_url: https://www.tbank.ru/career/vacancies/all/moscow/
+    link_contains:
+      - /career/service/vacancy/
+    path_regex: "/career/service/vacancy/[^/]+/[^/]+/[0-9a-f-]{8,}"
+    path_exclude:
+      - operator-rannego
+      - predstavitel
+
+  - id: avito
+    name: Авито
+    kind: html_list
+    enabled: true
+    list_url: https://career.avito.com/vacancies/
+    link_contains:
+      - /vacancies/
+    path_regex: "/vacancies/[^/]+/\\d+"
+    path_exclude:
+      - /teams/job/
+
+  - id: vk
+    name: VK
+    kind: html_list
+    enabled: true
+    list_url: https://team.vk.company/vacancy/?search=&town=
+    link_contains:
+      - /vacancy/
+    path_regex: "/vacancy/\\d+"
+
+  - id: alfa
+    name: Альфа-Банк
+    kind: html_list
+    # SSR почти пустой + битый SSL на части окружений.
+    enabled: false
+    ssl_verify: false
+    list_url: https://job.alfabank.ru/vacancies
+    link_contains:
+      - vacancy
+      - vacancies
+
+  - id: ozon
+    name: Ozon
+    kind: html_list
+    # Часто 403 без браузерного fingerprint.
+    enabled: false
+    list_url: https://job.ozon.ru/
+    link_contains:
+      - vacancy
+      - vacancies
+      - job
+
+  - id: mts
+    name: МТС
+    kind: html_list
+    # Листинг отдаёт category-URL (?cat=), не карточки вакансий.
+    enabled: false
+    list_url: https://job.mts.ru/vacancies
+    link_contains:
+      - /vacancy
+      - /vacancies/
+  - id: wildberries
+    name: Wildberries
+    kind: html_list
+    # SSR без карточек вакансий.
+    enabled: false
+    list_url: https://career.wb.ru/
+    link_contains:
+      - vacancy
+      - vacancies
+      - job
+
+# Фильтр по тексту ссылки/якоря (роли профиля CPO/HoP).
+title_relevance_any:
+  - product
+  - продукт
+  - продакт
+  - cpo
+  - "head of"
+  - owner
+  - lead
+  - директор
+  - руководитель
+  - manager
+  - менеджер

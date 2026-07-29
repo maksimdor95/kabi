@@ -1,0 +1,232 @@
+# Каталог мест, куда менеджеру ходить за возможностями выступить / дать экспертность.
+#
+# Выведен на примере реального медиа-следа product/HR-tech эксперта
+# (публикации, эфиры, колонки). Это НЕ заточка под одного человека:
+# набор площадок типичен для Head of Product / CPO / skill-based / EdTech / HR-tech.
+#
+# kind:
+#   media      — СМИ / отраслевые издания (коммент, колонка, интервью)
+#   podcast    — подкасты / YouTube / аудио
+#   tv         — ТВ / крупные эфиры
+#   conference — сценические конференции (часто с CFP)
+#   community  — отраслевые площадки / edu-медиа
+#
+# how (что предлагать):
+#   expert_comment | column | interview | podcast_guest | cfp_talk | workshop
+#
+# Статус M3: seed → Opportunity(type=talk). Живые парсеры CFP — позже по месту.
+
+places:
+  # --- Деловые СМИ (экспертный коммент / колонка) ---
+  - id: rbc
+    name: РБК
+    kind: media
+    how: expert_comment
+    url: https://www.rbc.ru/
+    topics: [рынок труда, экономика, навыки, кадры, AI в HR]
+  - id: rbc-pro
+    name: РБК Pro
+    kind: media
+    how: column
+    url: https://pro.rbc.ru/
+    topics: [рынок труда, бизнес, образование, skills]
+  - id: rbc-trends
+    name: РБК Trends
+    kind: media
+    how: column
+    url: https://trends.rbc.ru/
+    topics: [образование, будущее профессий, технологии]
+  - id: rbc-life
+    name: РБК Life
+    kind: media
+    how: interview
+    url: https://www.rbc.ru/life/
+    topics: [карьера, обучение, навыки]
+  - id: rbc-tv
+    name: Телеканал РБК
+    kind: tv
+    how: interview
+    url: https://tv.rbc.ru/
+    topics: [рынок труда, экономика, IT]
+  - id: kommersant
+    name: Коммерсантъ
+    kind: media
+    how: column
+    url: https://www.kommersant.ru/
+    topics: [skill-based, рынок труда, навыки, найм]
+  - id: vedomosti
+    name: Ведомости
+    kind: media
+    how: column
+    url: https://www.vedomosti.ru/
+    topics: [обучение, гибрид, кадры, непрерывное образование]
+  - id: tass
+    name: ТАСС
+    kind: media
+    how: expert_comment
+    url: https://tass.ru/
+    topics: [экономика, общество, рынок труда]
+  - id: izvestia
+    name: Известия
+    kind: media
+    how: expert_comment
+    url: https://iz.ru/
+    topics: [найм, ИИ в HR, вакансии, кадры]
+  - id: forbes
+    name: Forbes
+    kind: media
+    how: interview
+    url: https://www.forbes.ru/
+    topics: [IT-навыки, образование, карьера]
+  - id: forbes-life
+    name: Forbes Life
+    kind: media
+    how: interview
+    url: https://www.forbes.ru/forbeslife
+    topics: [образование, карьера]
+  - id: lenta
+    name: Lenta.ru
+    kind: media
+    how: expert_comment
+    url: https://lenta.ru/
+    topics: [навыки, рынок труда]
+  - id: gazeta
+    name: Газета.Ru
+    kind: media
+    how: expert_comment
+    url: https://www.gazeta.ru/
+    topics: [бизнес, найм, навыки]
+  - id: rg
+    name: Российская газета
+    kind: media
+    how: expert_comment
+    url: https://rg.ru/
+    topics: [образование, профессии, IT, найм]
+  - id: ng
+    name: Независимая газета
+    kind: media
+    how: expert_comment
+    url: https://www.ng.ru/
+    topics: [студенты, экономика, кадры]
+  - id: kp
+    name: Комсомольская правда
+    kind: media
+    how: expert_comment
+    url: https://www.kp.ru/
+    topics: [карьера, обучение]
+  - id: aif
+    name: Аргументы и факты
+    kind: media
+    how: expert_comment
+    url: https://aif.ru/
+    topics: [общество, труд]
+
+  # --- IT / digital / HR-tech медиа ---
+  - id: cnews
+    name: CNews
+    kind: media
+    how: expert_comment
+    url: https://www.cnews.ru/
+    topics: [IT-навыки, HeadHunter, цифровая трансформация, топ-менеджеры]
+  - id: vc
+    name: vc.ru
+    kind: media
+    how: column
+    url: https://vc.ru/
+    topics: [skill-based, hh.ru, методология навыков, алгоритмы, продукт, product]
+  - id: hh-media
+    name: hh.ru (редакция / экспертные статьи)
+    kind: media
+    how: column
+    url: https://hh.ru/article
+    topics: [навыки, skill-based, рынок труда, калькулятор навыков]
+  - id: comnews
+    name: ComNews
+    kind: media
+    how: expert_comment
+    url: https://www.comnews.ru/
+    topics: [подтверждение навыков, IT-компании, скиллы]
+  - id: computerra
+    name: Computerra
+    kind: media
+    how: column
+    url: https://www.computerra.ru/
+    topics: [skill-based, курсы, образование, сертификаты]
+  - id: tadviser
+    name: TAdviser
+    kind: media
+    how: expert_comment
+    url: https://www.tadviser.ru/
+    topics: [IT, HR-tech, навыки, цифровая трансформация]
+  - id: inc
+    name: Inc. Russia
+    kind: media
+    how: interview
+    url: https://incrussia.ru/
+    topics: [AI, цифровые навыки, IT-рынок, продукт]
+  - id: secret-mag
+    name: Secret Mag
+    kind: media
+    how: expert_comment
+    url: https://secretmag.ru/
+    topics: [ChatGPT, программисты, IT]
+  - id: the-hrd
+    name: The HRD
+    kind: media
+    how: column
+    url: https://thehrd.ru/
+    topics: [skill-based, HR, корпоративное обучение]
+  - id: hightech
+    name: HighTech FM / HighTech
+    kind: podcast
+    how: podcast_guest
+    url: https://hightech.fm/
+    topics: [IT-калькулятор, навыки, технологии, продукт]
+  - id: theoryandpractice
+    name: Theory and Practice
+    kind: community
+    how: interview
+    url: https://theoryandpractice.ru/
+    topics: [требования к навыкам, рынок труда]
+  - id: setters
+    name: Setters
+    kind: community
+    how: interview
+    url: https://setters.media/
+    topics: [будущее работы, тренды, продукт]
+  - id: sravni
+    name: Сравни.ру
+    kind: media
+    how: expert_comment
+    url: https://www.sravni.ru/
+    topics: [IT-навыки, карьера]
+  - id: it-speaker
+    name: IT Speaker
+    kind: community
+    how: interview
+    url: https://itspeaker.ru/
+    topics: [калькулятор навыков, IT, продукт]
+
+  # --- EdTech / обучение ---
+  - id: skillbox
+    name: Skillbox (медиа / экспертность)
+    kind: community
+    how: interview
+    url: https://skillbox.ru/media/
+    topics: [IT-навыки, обучение, карьера, продукт]
+  - id: skillfactory
+    name: Skillfactory
+    kind: community
+    how: workshop
+    url: https://skillfactory.ru/
+    topics: [управление IT-продуктом, EdTech, продукт, product]
+
+  # --- ТВ ---
+  - id: ntv
+    name: НТВ
+    kind: tv
+    how: interview
+    url: https://www.ntv.ru/
+    topics: [общество, труд]
+
+  # Конференции / CFP переехали в data/open_cfp.yaml (этап M5 — живой мониторинг).

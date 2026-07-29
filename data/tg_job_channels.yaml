@@ -1,0 +1,62 @@
+# Каналы вакансий в Telegram (M7a).
+# Публичные читаем через https://t.me/s/<username> — бота в админы НЕ нужно.
+# Закрытый канал: добавь @YouUkabi_bot админом (иначе коннектор не увидит посты).
+
+channels:
+  # --- must (подписки пользователя) ---
+  - username: forproducts
+    title: Job for Products and Projects
+    priority: must
+    notes: Product / PO / CPO
+  - username: forchiefs
+    title: Job for Chiefs
+    priority: must
+    notes: ТОП IT/digital
+  - username: nrgjobs
+    title: Вакансии в топ стартапах (NRG)
+    priority: must
+    notes: VC-curated startups
+  - username: HRity
+    title: HRity
+    priority: must
+    notes: IT/digital, модерация
+  - username: yojob
+    title: Dream Job
+    priority: must
+    notes: Крупные компании
+  - username: vacanciesbest
+    title: Лучшие вакансии
+    priority: must
+    notes: Курируемый агрегат
+
+  # --- optional ---
+  - username: pm_jobs
+    title: PM jobs
+    priority: optional
+    notes: Project/Product managers
+  - username: digital_jobs
+    title: Digital jobs
+    priority: optional
+    notes: Digital + product
+  - username: startupjobs
+    title: Startup jobs
+    priority: optional
+    notes: Стартапы
+
+# Сколько последних постов читать с канала за один fetch
+posts_per_channel: 25
+
+# Ключевые слова в тексте поста — иначе отбрасываем (шум продаж/junior).
+# Пустой список = не фильтровать по тексту (только дедуп).
+relevance_any:
+  - product
+  - продукт
+  - продакт
+  - cpo
+  - "head of product"
+  - "product lead"
+  - "product owner"
+  - "product manager"
+  - директор по продукту
+  - руководитель продукта
+  - chief product

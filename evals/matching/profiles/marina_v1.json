@@ -1,0 +1,48 @@
+{
+  "id": "marina_v1",
+  "roles": ["Head of Product", "Product Lead", "CPO"],
+  "location": "Москва",
+  "work_mode": "hybrid",
+  "skills": [
+    "Product Management",
+    "Product Marketing",
+    "Scrum",
+    "Agile",
+    "A/B тесты",
+    "unit-экономика",
+    "P&L",
+    "SQL",
+    "стратегия",
+    "монетизация",
+    "карьерные платформы",
+    "AI-трансформация"
+  ],
+  "languages": ["русский (родной)", "английский (свободно)", "испанский (A2)"],
+  "speaking_topics": [
+    "Разработка и масштабирование новых направлений в бизнесе",
+    "Монетизация карьерных платформ",
+    "AI-трансформация карьерных платформ",
+    "продукт и рост",
+    "стратегия"
+  ],
+  "salary_expectation": {"min": 500000, "currency": "RUB"},
+  "priorities": "both",
+  "hard_nos": {
+    "industries": [
+      "гемблинг",
+      "gambling",
+      "igaming",
+      "казино",
+      "букмекер",
+      "табак",
+      "tobacco"
+    ]
+  },
+  "experience": [
+    {"org": "HeadHunter", "role": "Head of Product"},
+    {"org": "Google", "role": "Product"},
+    {"org": "МТС", "role": "Product"}
+  ],
+  "goals": "Роли Head of Product / CPO, hybrid Москва, продукт и рост",
+  "notes": "Эталон под первого пользователя (anonymized fixture). Не PII третьих лиц."
+}
