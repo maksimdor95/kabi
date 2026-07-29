@@ -36,25 +36,41 @@ REMOTE_DIR=$REMOTE_DIR
 REPO_URL=$REPO_URL
 BRANCH=$BRANCH
 
-if [[ ! -d "\$REMOTE_DIR/.git" ]]; then
-  rm -rf "\$REMOTE_DIR"
-  git clone --branch "\$BRANCH" "\$REPO_URL" "\$REMOTE_DIR"
-else
+# Никогда не rm -rf: сохраняем .env / .venv / uploads.
+if [[ -d "\$REMOTE_DIR/.git" ]]; then
   cd "\$REMOTE_DIR"
   git fetch origin
   git checkout "\$BRANCH"
   git pull --ff-only origin "\$BRANCH"
+elif [[ -d "\$REMOTE_DIR" ]]; then
+  cd "\$REMOTE_DIR"
+  git init -b "\$BRANCH"
+  git remote add origin "\$REPO_URL" 2>/dev/null || git remote set-url origin "\$REPO_URL"
+  git fetch origin
+  git checkout -f "origin/\$BRANCH"
+  git branch -M "\$BRANCH"
+  git branch --set-upstream-to="origin/\$BRANCH" "\$BRANCH" || true
+else
+  git clone --branch "\$BRANCH" "\$REPO_URL" "\$REMOTE_DIR"
+  cd "\$REMOTE_DIR"
 fi
 
-cd "\$REMOTE_DIR"
-if [[ -d .venv ]]; then
-  # shellcheck disable=SC1091
-  source .venv/bin/activate
-  pip install -q -e .
+if [[ ! -d .venv ]]; then
+  python3.12 -m venv .venv
+fi
+# shellcheck disable=SC1091
+source .venv/bin/activate
+pip install -q -U pip
+pip install -q -e .
+
+if [[ ! -f .env ]]; then
+  echo "ERROR: нет \$REMOTE_DIR/.env — скопируй с Mac (scp), не коммить в Git."
+  exit 1
 fi
 
 if systemctl is-enabled kabi-bot >/dev/null 2>&1; then
   sudo systemctl restart kabi-bot
+  sleep 2
   sudo systemctl is-active kabi-bot
   echo "Логи: journalctl -u kabi-bot -n 20 --no-pager"
 fi
