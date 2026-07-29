@@ -43,6 +43,9 @@ class JobConnector(Protocol):
 - **Getmatch:** веб-API за логином / SPA без SSR → публичный канал
   `t.me/s/g_jobchannel` + обогащение страницы вакансии.
 - **TG:** публичные каналы через `t.me/s/` без админ-прав.
+  Короткий HTTP timeout (~8s): с части облаков `t.me` висит долго.
+- **Runner jobs:** сохранение после **каждого** коннектора — медленный scrape
+  не блокирует уже полученные HH/SJ (иначе `/today` пустой, пока TG таймаутит).
 
 ## 8. Тесты / evals
 - `tests/test_m7_connectors.py` — TG / career / Getmatch / Habr без сети.

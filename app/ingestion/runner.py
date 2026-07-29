@@ -202,21 +202,37 @@ async def ingest_jobs_for_profile(
         return IngestionResult(fetched=0, saved=0, skipped_existing=0)
 
     logger.info("Ингестия jobs: keywords=%s area=%s", keywords, area)
-    drafts: list[OpportunityDraft] = []
+    # Сохраняем после каждого коннектора: медленный TG/scrape не блокирует HH/SJ.
+    total = IngestionResult(fetched=0, saved=0, skipped_existing=0)
     for connector in connectors:
         try:
-            drafts.extend(await connector.fetch(keywords, area=area))
+            batch = await connector.fetch(keywords, area=area)
         except Exception as exc:
             logger.warning("Коннектор %s упал: %s", connector.source, exc)
+            continue
+        if not batch:
+            continue
+        r = await _save_drafts(session, batch)
+        total = IngestionResult(
+            fetched=total.fetched + r.fetched,
+            saved=total.saved + r.saved,
+            skipped_existing=total.skipped_existing + r.skipped_existing,
+        )
+        logger.info(
+            "Ингестия %s: fetched=%d saved=%d skipped=%d",
+            connector.source,
+            r.fetched,
+            r.saved,
+            r.skipped_existing,
+        )
 
-    result = await _save_drafts(session, drafts)
     logger.info(
         "Ингестия jobs: fetched=%d saved=%d skipped=%d",
-        result.fetched,
-        result.saved,
-        result.skipped_existing,
+        total.fetched,
+        total.saved,
+        total.skipped_existing,
     )
-    return result
+    return total
 
 
 async def ingest_talks(

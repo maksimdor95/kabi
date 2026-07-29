@@ -160,8 +160,11 @@ class TelegramJobsConnector:
                 relevance.append(kw)
 
         out: list[OpportunityDraft] = []
+        # Короткий timeout: с части облаков t.me/s долго висит и раньше
+        # блокировал сохранение HH/SJ (ингестия ждала все каналы).
+        timeout = httpx.Timeout(8.0, connect=4.0)
         async with httpx.AsyncClient(
-            timeout=30.0,
+            timeout=timeout,
             headers={"User-Agent": _UA},
             follow_redirects=True,
         ) as client:
