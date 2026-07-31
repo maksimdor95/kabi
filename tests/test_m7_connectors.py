@@ -84,7 +84,7 @@ _FIXTURE_HABR_HTML = """
 def test_tg_config_has_must_channels():
     cfg = load_tg_config()
     names = {c["username"] for c in cfg["channels"]}
-    assert {"forproducts", "forchiefs", "nrgjobs", "HRity"} <= names
+    assert {"forproducts", "forchiefs", "nrgjobs", "HRity", "peersjobboard"} <= names
 
 
 def test_parse_channel_keeps_product_drops_courier():

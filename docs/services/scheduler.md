@@ -18,7 +18,14 @@ async def deadline_reminders(bot: Bot) -> None: ...
 ```
 
 ## 4. Расписание профиля
-Поле `Profile.digest_schedule` (JSONB), дефолт:
+Поле `Profile.digest_schedule` (JSONB) + **`Profile.priorities`** (`job`/`talk`/`both`):
+
+Watch/scheduled тик шлёт только каналы по приоритету:
+- `job` → только вакансии
+- `talk` → только выступления (СМИ/CFP)
+- `both` → оба
+
+Меню Telegram строится тем же правилом (`main_menu_keyboard(priorities)`).
 
 | Поле | Значение |
 |------|----------|

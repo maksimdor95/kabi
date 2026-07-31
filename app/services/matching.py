@@ -152,6 +152,62 @@ def _talk_status(opp: Opportunity) -> str:
     return "open"
 
 
+# Роли, которые не предлагаем CPO/HoP-профилю (технарь / PM проектов / масса).
+_TECH_TITLE_RE = re.compile(
+    r"(?:"
+    r"\b(?:backend|frontend|fullstack|full[\s-]?stack|devops|sre|qa)\b|"
+    r"\b(?:android|ios|flutter|golang|kotlin|php|java|python|c\+\+|embedded)\b|"
+    r"(?:разработчик|программист|тестировщик|инженер\s+данных|data\s+engineer|"
+    r"ml\s+engineer|системный\s+администратор)|"
+    r"(?:курьер|водитель|оператор\s+колл)"
+    r")",
+    re.I,
+)
+_PROJECT_NOT_PRODUCT_RE = re.compile(
+    r"(?:"
+    r"\bproject\s+manager\b|"
+    r"менеджер\s+проектов|"
+    r"руководитель\s+проектов|"
+    r"лидер\s+проекта|"
+    r"ceo\s+проекта|"
+    r"scrum\s+master|"
+    r"бизнес[\s-]?аналитик|"
+    r"business\s+analyst"
+    r")",
+    re.I,
+)
+_PRODUCT_SIGNAL_RE = re.compile(
+    r"(?:"
+    r"\bproduct\b|продукт|продакт|\bcpo\b|"
+    r"product\s+owner|product\s+manager|product\s+lead|"
+    r"head\s+of\s+product|директор\s+по\s+продукту|"
+    r"руководитель\s+продукт|владелец\s+продукт"
+    r")",
+    re.I,
+)
+
+
+def _job_fits_product_track(opp: Opportunity, profile: Profile) -> bool:
+    """Отсечь явный техтрек и «менеджер проектов» без product-сигнала."""
+    title = opp.title or ""
+    desc = (opp.description or "")[:600]
+    blob = f"{title}\n{desc}"
+
+    if _TECH_TITLE_RE.search(title) and not _PRODUCT_SIGNAL_RE.search(title):
+        return False
+    if _PROJECT_NOT_PRODUCT_RE.search(title) and not _PRODUCT_SIGNAL_RE.search(blob):
+        return False
+
+    roles_blob = " ".join(getattr(profile, "roles", None) or []).lower()
+    product_profile = any(
+        x in roles_blob
+        for x in ("product", "продукт", "cpo", "продакт", "owner")
+    )
+    if product_profile and not _PRODUCT_SIGNAL_RE.search(blob):
+        return False
+    return True
+
+
 def passes_hard_filters(opp: Opportunity, profile: Profile) -> bool:
     """Хард-фильтры до ранжирования."""
     opp_type = getattr(opp, "type", None) or "job"
@@ -164,6 +220,8 @@ def passes_hard_filters(opp: Opportunity, profile: Profile) -> bool:
             ceiling = opp.salary.get("max") or opp.salary.get("min")
             if ceiling is not None and ceiling < min_salary:
                 return False
+        if not _job_fits_product_track(opp, profile):
+            return False
 
     if opp_type == "talk":
         # closed/watch — не actionable прямо сейчас.

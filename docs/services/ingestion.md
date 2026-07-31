@@ -55,11 +55,13 @@ class JobConnector(Protocol):
 Профиль: **Head of Product / CPO**, Москва, senior, product/EdTech/career-tech.
 
 - **M2:** HeadHunter + SuperJob.
-- **M7a ✅:** TG из `data/tg_job_channels.yaml`.
+- **M7a ✅:** TG из `data/tg_job_channels.yaml` (в т.ч. `peersjobboard`).
 - **M7b ✅:** Getmatch через `g_jobchannel` (`source=getmatch.ru`).
 - **M7c ✅:** `data/career_sites.yaml` — Яндекс API; Avito/VK/T-Bank HTML с
   `path_regex`; Sber/Alfa/Ozon/MTS/WB выкл. (SPA/403/SSL) до стабильного API.
 - **M7d ✅:** Хабр Карьера RSS (+ HTML fallback), `source=career.habr.com`.
+- **Talks seed:** `talk_places.yaml` сужен — массовые СМИ `enabled: false`,
+  в питч идут product-релевантные площадки (vc, cnews, skillfactory…).
 
 ## 10. Открытые вопросы
 - Включить Sber/Alfa/Ozon, когда появится публичный JSON/SSR.

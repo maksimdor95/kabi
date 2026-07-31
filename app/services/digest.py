@@ -43,6 +43,7 @@ class DigestItem:
     opp_type: str = "job"  # job | talk
     deadline: datetime | None = None
     link_label: str | None = None
+    description: str | None = None
 
 
 def _talk_link_label(opp: Opportunity) -> str:
@@ -71,6 +72,7 @@ def _fmt_item(match: Match, opp: Opportunity) -> DigestItem:
         opp_type=opp.type or "job",
         deadline=opp.deadline,
         link_label=_talk_link_label(opp),
+        description=opp.description,
     )
 
 

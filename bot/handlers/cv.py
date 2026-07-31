@@ -13,7 +13,7 @@ from app.services import cv_parser, dialogue_agent
 from app.services import profile as profile_service
 from app.services.dialogue_agent import AgentReply
 from app.services.onboarding import extract_urls
-from bot.keyboards import main_menu_keyboard, reply_keyboard
+from bot.keyboards import main_menu_keyboard, menu_for_profile, reply_keyboard
 
 router = Router(name="cv")
 logger = get_logger("kabi.bot.cv")
@@ -76,7 +76,7 @@ async def on_document(message: Message, bot: Bot) -> None:
                 f"{extra}\n\n"
                 "Смотри /today · /pitch · /talks · /saved\n"
                 "Онбординг заново — «начать заново».",
-                reply_markup=main_menu_keyboard(),
+                reply_markup=menu_for_profile(profile),
             )
             return
 
@@ -88,7 +88,7 @@ async def on_document(message: Message, bot: Bot) -> None:
                 await session.commit()
                 markup = reply_keyboard(reply.buttons) if reply.buttons else None
                 if reply.remove_keyboard:
-                    markup = main_menu_keyboard()
+                    markup = menu_for_profile(profile)
                 await message.answer(_merge_after_cv(reply), reply_markup=markup)
                 return
             await session.commit()
@@ -102,7 +102,7 @@ async def on_document(message: Message, bot: Bot) -> None:
             await session.commit()
             markup = reply_keyboard(reply.buttons) if reply.buttons else None
             if reply.finished or reply.remove_keyboard:
-                markup = main_menu_keyboard()
+                markup = menu_for_profile(profile)
             await message.answer(_merge_after_cv(reply), reply_markup=markup)
             return
 

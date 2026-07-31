@@ -57,3 +57,6 @@ M4: ranking использует `Profile.embedding`, который сдвиг�
 - `fresh_relevant` (дефолт): blend similarity + recency(`fetched_at`);
 - `relevant`: только cosine. Watch-доставка дополнительно режет по возрасту
   (`max_age_hours`).
+
+Хард-фильтры jobs (CPO/HoP-трек): отсекаем явный tech IC (backend/devops/…)
+и «менеджер проектов» без product-сигнала в title/description.

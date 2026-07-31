@@ -24,7 +24,7 @@ from app.services.onboarding import STEPS
 from bot.keyboards import (
     card_keyboard,
     format_card,
-    main_menu_keyboard,
+    menu_for_profile,
     remove_keyboard,
     reply_keyboard,
 )
@@ -70,7 +70,7 @@ async def _answer_not_ready(message: Message, profile: Profile | None) -> None:
     await message.answer(
         "Профиль ещё не готов к подбору. Открой /profile — чего не хватает, "
         "или допиши зарплату / красные флаги в чат.",
-        reply_markup=main_menu_keyboard(),
+        reply_markup=menu_for_profile(profile),
     )
 
 
@@ -86,7 +86,7 @@ async def on_today(message: Message) -> None:
             return
         await message.answer(
             "Собираю свежие вакансии… 🔎",
-            reply_markup=main_menu_keyboard(),
+            reply_markup=menu_for_profile(profile),
         )
         items = await digest_service.build_digest(session, profile, scope="jobs")
         await session.commit()
@@ -94,7 +94,7 @@ async def on_today(message: Message) -> None:
     if not items:
         await message.answer(
             "Свежих подходящих вакансий пока не нашёл. "
-            "СМИ/подкасты — /pitch, CFP — /talks."
+            "СМИ/подкасты — /pitch, конференции — /talks."
         )
         return
 
@@ -121,7 +121,7 @@ async def on_pitch(message: Message) -> None:
             return
         await message.answer(
             "Подбираю СМИ и подкасты для питча… 🎙️",
-            reply_markup=main_menu_keyboard(),
+            reply_markup=menu_for_profile(profile),
         )
         items = await digest_service.build_digest(session, profile, scope="pitch")
         await session.commit()
@@ -195,7 +195,7 @@ async def on_talks(message: Message) -> None:
     await message.answer(
         deadlines_service.format_deadlines_message(items),
         disable_web_page_preview=True,
-        reply_markup=main_menu_keyboard(),
+        reply_markup=menu_for_profile(profile),
     )
 
 

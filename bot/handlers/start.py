@@ -10,7 +10,7 @@ from app.db.session import get_session
 from app.services import dialogue_agent
 from app.services import profile as profile_service
 from app.services.onboarding import STEPS
-from bot.keyboards import main_menu_keyboard, remove_keyboard, reply_keyboard
+from bot.keyboards import main_menu_keyboard, menu_for_profile, remove_keyboard, reply_keyboard
 
 router = Router(name="start")
 
@@ -39,12 +39,12 @@ async def on_start(message: Message) -> None:
         roles = ", ".join((profile.roles or [])[:3]) or "профиль"
         await message.answer(
             f"Снова привет! Профиль уже собран ({roles}).\n\n"
-            "Меню внизу: Вакансии · Питч · CFP · Избранное · Профиль\n"
-            "Или команды /profile /today /pitch /talks /saved\n\n"
+            "Меню внизу зависит от приоритета (Работа / Выступления / Оба).\n"
+            "Команды: /profile /today /pitch /talks /saved /schedule\n\n"
             "Новое резюме — обновлю без повторных вопросов.\n"
             "Ссылки (сайт, LinkedIn) можно кидать в чат в любой момент.\n"
             "Онбординг заново — «начать заново».",
-            reply_markup=main_menu_keyboard(),
+            reply_markup=menu_for_profile(profile),
         )
         return
 

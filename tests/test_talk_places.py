@@ -8,16 +8,20 @@ from app.ingestion.talks.url_quality import is_actionable_cfp_url
 
 def test_load_places_has_media_no_conferences():
     places = load_places()
-    assert len(places) >= 25
+    # После сужения каталога — только product-релевантные площадки (enabled≠false).
+    assert len(places) >= 15
     kinds = {p["kind"] for p in places}
     assert "media" in kinds
-    assert "podcast" in kinds
+    assert "podcast" in kinds or "community" in kinds
     # CFP-конференции переехали в data/open_cfp.yaml
     assert "conference" not in kinds
     ids = {p["id"] for p in places}
-    assert "rbc" in ids
+    assert "vc" in ids
     assert "cnews" in ids
-    assert "kommersant" in ids
+    assert "skillfactory" in ids
+    # Массовые СМИ выключены (enabled: false)
+    assert "rbc" not in ids
+    assert "kommersant" not in ids
     assert "productsense" not in ids
     assert "youtube-career" not in ids
     assert "digital-officer" not in ids
@@ -86,9 +90,10 @@ def test_media_has_no_invented_deadline():
 
 def test_connector_fetch_offline():
     drafts = asyncio.run(TalkPlacesConnector(live_cfp=False).fetch())
-    assert len(drafts) >= 25
+    assert len(drafts) >= 15
     assert all(d.type == "talk" for d in drafts)
     assert len({d.external_id for d in drafts}) == len(drafts)
     by_id = {d.external_id: d for d in drafts}
-    assert by_id["rbc"].deadline is None
+    assert "vc" in by_id
+    assert "rbc" not in by_id
     assert all(d.meta.get("kind") != "conference" for d in drafts if d.meta)

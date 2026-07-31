@@ -48,7 +48,14 @@ def load_places(path: Path | None = None) -> list[dict[str, Any]]:
     places = data.get("places") or []
     if not isinstance(places, list):
         return []
-    return [p for p in places if isinstance(p, dict) and p.get("id") and p.get("name")]
+    return [
+        p
+        for p in places
+        if isinstance(p, dict)
+        and p.get("id")
+        and p.get("name")
+        and p.get("enabled", True) is not False
+    ]
 
 
 def _parse_deadline(raw: Any) -> datetime | None:

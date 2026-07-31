@@ -63,10 +63,22 @@ def test_hard_no_term_rejected():
     assert passes_hard_filters(opp, profile) is False
 
 
-def test_hard_no_term_allows_others():
-    opp = _opp(org="Fintech Bank")
-    profile = _profile(hard_nos={"industries": ["casino"]})
-    assert passes_hard_filters(opp, profile) is True
+def test_tech_title_rejected_for_product_profile():
+    opp = _opp(title="Senior Python Developer", description="Писать сервисы на FastAPI")
+    assert passes_hard_filters(opp, _profile()) is False
+
+
+def test_project_manager_without_product_rejected():
+    opp = _opp(
+        title="Менеджер проектов, Контент",
+        description="Ведение контент-проектов и сроков",
+    )
+    assert passes_hard_filters(opp, _profile()) is False
+
+
+def test_product_lead_kept():
+    opp = _opp(title="Product Lead / Head of Product", description="Владение продуктом")
+    assert passes_hard_filters(opp, _profile()) is True
 
 
 def test_talk_closed_rejected():

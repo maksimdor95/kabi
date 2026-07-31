@@ -18,7 +18,7 @@ from bot.keyboards import (
     MENU_SAVED,
     MENU_TODAY,
     delete_confirm_keyboard,
-    main_menu_keyboard,
+    menu_for_profile,
     remove_keyboard,
 )
 
@@ -54,7 +54,7 @@ async def send_profile_card(message: Message) -> None:
         profile_service.format_profile_card(profile),
         parse_mode="HTML",
         disable_web_page_preview=True,
-        reply_markup=main_menu_keyboard(),
+        reply_markup=menu_for_profile(profile),
     )
 
 
@@ -96,7 +96,7 @@ async def on_delete_cancel(callback: CallbackQuery) -> None:
         pass
     await callback.message.answer(
         "Ок, профиль на месте.",
-        reply_markup=main_menu_keyboard(),
+        reply_markup=menu_for_profile(None),
     )
 
 
@@ -158,21 +158,21 @@ async def on_schedule(message: Message) -> None:
                     "Не понял. Пример: «мониторинг вкл», «вакансии будни 9:00», "
                     "«режим свежие», «тихие часы 23:00-8:00».\n\n"
                     + schedule_service.format_schedule(profile.digest_schedule),
-                    reply_markup=main_menu_keyboard(),
+                    reply_markup=menu_for_profile(profile),
                 )
                 return
             profile.digest_schedule = updated
             await session.commit()
             await message.answer(
                 "Обновил.\n\n" + schedule_service.format_schedule(updated),
-                reply_markup=main_menu_keyboard(),
+                reply_markup=menu_for_profile(profile),
             )
             return
 
         await session.commit()
         await message.answer(
             schedule_service.format_schedule(profile.digest_schedule),
-            reply_markup=main_menu_keyboard(),
+            reply_markup=menu_for_profile(profile),
         )
 
 
@@ -190,7 +190,7 @@ async def on_menu_other(message: Message) -> None:
 
         await on_today(message)
         return
-    if text == MENU_PITCH:
+    if text in (MENU_PITCH, "🎙️ Питч"):
         from bot.handlers.digest import on_pitch
 
         await on_pitch(message)
@@ -200,7 +200,7 @@ async def on_menu_other(message: Message) -> None:
 
         await on_saved(message)
         return
-    if text == MENU_DEADLINES:
+    if text in (MENU_DEADLINES, "🎤 CFP"):
         from bot.handlers.digest import on_deadlines
 
         await on_deadlines(message)

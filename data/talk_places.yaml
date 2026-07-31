@@ -19,54 +19,63 @@
 places:
   # --- Деловые СМИ (экспертный коммент / колонка) ---
   - id: rbc
+    enabled: false
     name: РБК
     kind: media
     how: expert_comment
     url: https://www.rbc.ru/
     topics: [рынок труда, экономика, навыки, кадры, AI в HR]
   - id: rbc-pro
+    enabled: false
     name: РБК Pro
     kind: media
     how: column
     url: https://pro.rbc.ru/
     topics: [рынок труда, бизнес, образование, skills]
   - id: rbc-trends
+    enabled: false
     name: РБК Trends
     kind: media
     how: column
     url: https://trends.rbc.ru/
     topics: [образование, будущее профессий, технологии]
   - id: rbc-life
+    enabled: false
     name: РБК Life
     kind: media
     how: interview
     url: https://www.rbc.ru/life/
     topics: [карьера, обучение, навыки]
   - id: rbc-tv
+    enabled: false
     name: Телеканал РБК
     kind: tv
     how: interview
     url: https://tv.rbc.ru/
     topics: [рынок труда, экономика, IT]
   - id: kommersant
+    enabled: false
     name: Коммерсантъ
     kind: media
     how: column
     url: https://www.kommersant.ru/
     topics: [skill-based, рынок труда, навыки, найм]
   - id: vedomosti
+    enabled: false
     name: Ведомости
     kind: media
     how: column
     url: https://www.vedomosti.ru/
     topics: [обучение, гибрид, кадры, непрерывное образование]
   - id: tass
+    enabled: false
     name: ТАСС
     kind: media
     how: expert_comment
     url: https://tass.ru/
     topics: [экономика, общество, рынок труда]
   - id: izvestia
+    enabled: false
     name: Известия
     kind: media
     how: expert_comment
@@ -79,42 +88,49 @@ places:
     url: https://www.forbes.ru/
     topics: [IT-навыки, образование, карьера]
   - id: forbes-life
+    enabled: false
     name: Forbes Life
     kind: media
     how: interview
     url: https://www.forbes.ru/forbeslife
     topics: [образование, карьера]
   - id: lenta
+    enabled: false
     name: Lenta.ru
     kind: media
     how: expert_comment
     url: https://lenta.ru/
     topics: [навыки, рынок труда]
   - id: gazeta
+    enabled: false
     name: Газета.Ru
     kind: media
     how: expert_comment
     url: https://www.gazeta.ru/
     topics: [бизнес, найм, навыки]
   - id: rg
+    enabled: false
     name: Российская газета
     kind: media
     how: expert_comment
     url: https://rg.ru/
     topics: [образование, профессии, IT, найм]
   - id: ng
+    enabled: false
     name: Независимая газета
     kind: media
     how: expert_comment
     url: https://www.ng.ru/
     topics: [студенты, экономика, кадры]
   - id: kp
+    enabled: false
     name: Комсомольская правда
     kind: media
     how: expert_comment
     url: https://www.kp.ru/
     topics: [карьера, обучение]
   - id: aif
+    enabled: false
     name: Аргументы и факты
     kind: media
     how: expert_comment
@@ -223,6 +239,7 @@ places:
 
   # --- ТВ ---
   - id: ntv
+    enabled: false
     name: НТВ
     kind: tv
     how: interview

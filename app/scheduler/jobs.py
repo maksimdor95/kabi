@@ -16,7 +16,7 @@ from app.services import deadlines as deadlines_service
 from app.services import digest as digest_service
 from app.services import schedule as schedule_service
 from app.services.matching import MatchScope
-from bot.keyboards import card_keyboard, format_card, main_menu_keyboard
+from bot.keyboards import card_keyboard, format_card, main_menu_keyboard, menu_for_profile
 
 logger = get_logger("kabi.scheduler")
 
@@ -93,6 +93,7 @@ async def _send_channel(
                 n_sent=len(items),
             )
         await session.commit()
+        prio = prof.priorities
 
     if not items:
         logger.info("%s %s tg=%s: empty", delivery, channel, telegram_id)
@@ -108,7 +109,7 @@ async def _send_channel(
         await bot.send_message(
             telegram_id,
             intro,
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(prio),
         )
         for item in items:
             await bot.send_message(
@@ -125,7 +126,7 @@ async def _send_channel(
 
 
 async def scheduled_digests(bot: Bot) -> None:
-    """Тик каждые 15 мин: watch или слот scheduled."""
+    """Тик каждые 15 мин: watch или слот scheduled — с учётом priorities."""
     async with get_session() as session:
         rows = (
             await session.execute(
@@ -139,8 +140,14 @@ async def scheduled_digests(bot: Bot) -> None:
         sched = schedule_service.normalize_schedule(profile.digest_schedule)
         last = dict(profile.last_digest_at or {})
         delivery = sched["delivery"]
+        prio = (profile.priorities or "both").lower()
+        channels: list[str] = []
+        if prio in ("job", "both"):
+            channels.append("jobs")
+        if prio in ("talk", "both"):
+            channels.append("talks")
 
-        for channel in ("jobs", "talks"):
+        for channel in channels:
             if delivery == "watch":
                 due = schedule_service.is_watch_due(
                     sched, channel, last_digest_at=last  # type: ignore[arg-type]
@@ -152,9 +159,10 @@ async def scheduled_digests(bot: Bot) -> None:
             if not due:
                 continue
             logger.info(
-                "digest due delivery=%s channel=%s tg=%s",
+                "digest due delivery=%s channel=%s prio=%s tg=%s",
                 delivery,
                 channel,
+                prio,
                 telegram_id,
             )
             n = await _send_channel(
@@ -216,7 +224,7 @@ async def deadline_reminders(bot: Bot) -> None:
                     telegram_id,
                     "\n".join(lines),
                     disable_web_page_preview=True,
-                    reply_markup=main_menu_keyboard(),
+                    reply_markup=menu_for_profile(profile),
                 )
             except TelegramAPIError as exc:
                 logger.warning("deadline remind failed tg=%s: %s", telegram_id, exc)

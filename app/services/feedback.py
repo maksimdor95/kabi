@@ -195,6 +195,7 @@ async def list_saved(session: AsyncSession, profile: Profile) -> list[DigestItem
                 source=opp.source,
                 opp_type=opp.type or "job",
                 deadline=opp.deadline,
+                description=opp.description,
             )
         )
     return items

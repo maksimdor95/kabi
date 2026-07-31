@@ -28,6 +28,10 @@ channels:
     title: Лучшие вакансии
     priority: must
     notes: Курируемый агрегат
+  - username: peersjobboard
+    title: Peers Jobs
+    priority: must
+    notes: Senior/executive — стратегия, продукт, ИИ (@peersmedia)
 
   # --- optional ---
   - username: pm_jobs

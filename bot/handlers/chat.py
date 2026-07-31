@@ -11,7 +11,7 @@ from app.services import profile as profile_service
 from app.services import schedule as schedule_service
 from bot.keyboards import (
     MAIN_MENU_BUTTONS,
-    main_menu_keyboard,
+    menu_for_profile,
     remove_keyboard,
     reply_keyboard,
 )
@@ -39,7 +39,7 @@ async def on_text(message: Message) -> None:
                 await session.commit()
                 await message.answer(
                     "Обновил расписание.\n\n" + schedule_service.format_schedule(updated),
-                    reply_markup=main_menu_keyboard(),
+                    reply_markup=menu_for_profile(profile),
                 )
                 return
             low = text.strip().lower()
@@ -47,15 +47,16 @@ async def on_text(message: Message) -> None:
                 await session.commit()
                 await message.answer(
                     schedule_service.format_schedule(profile.digest_schedule),
-                    reply_markup=main_menu_keyboard(),
+                    reply_markup=menu_for_profile(profile),
                 )
                 return
 
         reply = await dialogue_agent.handle_message(session, user, text)
         await session.commit()
+        profile = await profile_service.get_profile(session, user.id)
 
     if reply.finished:
-        markup = main_menu_keyboard()
+        markup = menu_for_profile(profile)
     elif reply.buttons:
         markup = reply_keyboard(reply.buttons)
     elif reply.remove_keyboard:
