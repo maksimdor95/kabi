@@ -58,5 +58,6 @@ M4: ranking использует `Profile.embedding`, который сдвиг�
 - `relevant`: только cosine. Watch-доставка дополнительно режет по возрасту
   (`max_age_hours`).
 
-Хард-фильтры jobs (CPO/HoP-трек): отсекаем явный tech IC (backend/devops/…)
-и «менеджер проектов» без product-сигнала в title/description.
+Хард-фильтры jobs (CPO/HoP-трек): отсекаем явный tech IC (backend/devops/…),
+«менеджер проектов» без product-сигнала, и product-IC (дизайнер / аналитик /
+маркетолог) без лидерского product-сигнала в title.

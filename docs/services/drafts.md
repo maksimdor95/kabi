@@ -39,4 +39,5 @@ async def draft_cfp_pitch(profile, opportunity) -> str: ...
 - Тон по умолчанию: деловой русский; при необходимости EN позже.
 
 ## 10. Статус
-M4: реализованы `draft_application` / `draft_cfp_pitch` + кнопка «✍️ Черновик» на карточке.
+M4: реализованы `draft_application` / `draft_cfp_pitch` + кнопка «✍️ Сопроводительное»
+на карточке (`callback_data=draft:{match_id}`, не `fb:draft:`).

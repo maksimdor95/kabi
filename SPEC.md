@@ -66,7 +66,7 @@ Mini App — отдельный этап M11 (после discovery CFP, job-sour
 
 | Этап | Содержание | Статус |
 |------|------------|--------|
-| **M7** | Хабр Карьера, Getmatch, TG-каналы, career sites | ✅ |
+| **M7** | Хабр, Getmatch, TG, career sites (вкл. Alfa/WB/Sber/MTS JSON) | ✅ |
 | **M8** | Evals подборки и объяснений (`docs/services/evals.md`) | ✅ |
 | **M9** | Диалог-советник «как менеджер» | — |
 | **M10** | Alembic-миграции | — |

@@ -176,6 +176,29 @@ _PROJECT_NOT_PRODUCT_RE = re.compile(
     r")",
     re.I,
 )
+# IC-роли рядом с «продуктом» (Product Designer / аналитик) — не CPO-трек.
+_PRODUCT_IC_RE = re.compile(
+    r"(?:"
+    r"дизайнер|designer|"
+    r"аналитик|analyst|"
+    r"researcher|исследователь|"
+    r"маркетолог|marketing\s+(?:manager|specialist)|"
+    r"контент[\s-]?менеджер|copywriter|копирайтер|"
+    r"рекрутер|recruiter|hr[\s-]?менеджер"
+    r")",
+    re.I,
+)
+_PRODUCT_LEADERSHIP_RE = re.compile(
+    r"(?:"
+    r"\bcpo\b|chief\s+product|"
+    r"head\s+of\s+product|vp\s+product|vice\s+president\s+of\s+product|"
+    r"директор\s+по\s+продукт|руководитель\s+(?:направления\s+)?продукт|"
+    r"product\s+(?:lead|manager|owner|director|head)|"
+    r"продакт[\s-]?менеджер|владелец\s+продукт|менеджер\s+продукт|"
+    r"руководитель\s+направления|директор\s+по"
+    r")",
+    re.I,
+)
 _PRODUCT_SIGNAL_RE = re.compile(
     r"(?:"
     r"\bproduct\b|продукт|продакт|\bcpo\b|"
@@ -203,8 +226,12 @@ def _job_fits_product_track(opp: Opportunity, profile: Profile) -> bool:
         x in roles_blob
         for x in ("product", "продукт", "cpo", "продакт", "owner")
     )
-    if product_profile and not _PRODUCT_SIGNAL_RE.search(blob):
-        return False
+    if product_profile:
+        # «Product Designer» / «продуктовый аналитик» — не лидерский трек.
+        if _PRODUCT_IC_RE.search(title) and not _PRODUCT_LEADERSHIP_RE.search(title):
+            return False
+        if not _PRODUCT_SIGNAL_RE.search(blob):
+            return False
     return True
 
 

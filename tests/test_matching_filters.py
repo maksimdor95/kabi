@@ -81,6 +81,32 @@ def test_product_lead_kept():
     assert passes_hard_filters(opp, _profile()) is True
 
 
+def test_product_designer_rejected_for_cpo():
+    opp = _opp(
+        title="Product Designer",
+        description="Дизайн продукта, UX research, Figma",
+    )
+    assert passes_hard_filters(opp, _profile()) is False
+
+
+def test_product_analyst_rejected_for_cpo():
+    opp = _opp(
+        title="Продуктовый аналитик",
+        description="Метрики продукта, SQL, A/B",
+    )
+    assert passes_hard_filters(opp, _profile()) is False
+
+
+def test_designer_without_product_rejected():
+    opp = _opp(title="UX-дизайнер", description="Интерфейсы мобильных приложений")
+    assert passes_hard_filters(opp, _profile()) is False
+
+
+def test_cpo_kept():
+    opp = _opp(title="Директор по продукту (CPO)", description="Стратегия продукта")
+    assert passes_hard_filters(opp, _profile()) is True
+
+
 def test_talk_closed_rejected():
     opp = _opp(
         type="talk",

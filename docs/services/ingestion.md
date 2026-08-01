@@ -53,18 +53,51 @@ class JobConnector(Protocol):
 - `tests/test_m7_connectors.py` — TG / career / Getmatch / Habr без сети.
 - Eval-пул после M7: `evals/matching/pools/jobs_m7_v2.jsonl` (HH + M7 sources).
 
-## 9. Первый пользователь и источники
-Профиль: **Head of Product / CPO**, Москва, senior, product/EdTech/career-tech.
+## 9. Карта источников (актуально)
 
-- **M2:** HeadHunter + SuperJob.
-- **M7a ✅:** TG из `data/tg_job_channels.yaml` (в т.ч. `peersjobboard`).
-- **M7b ✅:** Getmatch через `g_jobchannel` (`source=getmatch.ru`).
-- **M7c ✅:** `data/career_sites.yaml` — Яндекс + **Alfa/WB/Sber/MTS JSON API**
-  (порт волны A из Leo); Avito/VK/T-Bank HTML; Ozon выкл. (antibot).
-  Source WB: `career_wb` (лейбл Wildberries).
-- **M7d ✅:** Хабр Карьера RSS (+ HTML fallback), `source=career.habr.com`.
-- **Talks seed:** `talk_places.yaml` сужен — массовые СМИ `enabled: false`,
-  в питч идут product-релевантные площадки (vc, cnews, skillfactory…).
+Профиль MVP: **Head of Product / CPO**, Москва, senior.
+
+### Коннекторы (`default_job_connectors`)
+
+| # | Коннектор | Source id | Статус |
+|---|-----------|-----------|--------|
+| 1 | HeadHunter API | `hh.ru` | ✅ |
+| 2 | SuperJob API | `superjob.ru` | ✅ |
+| 3 | Telegram job channels | `tg_<channel>` | ✅ |
+| 4 | Career sites (см. ниже) | `career_*` | ✅ |
+| 5 | Getmatch (via `g_jobchannel`) | `getmatch.ru` | ✅ |
+| 6 | Хабр Карьера RSS/HTML | `career.habr.com` | ✅ |
+
+### Career sites (`data/career_sites.yaml`)
+
+| Компания | Kind | Source | Статус |
+|----------|------|--------|--------|
+| Яндекс | `yandex_api` | `career_yandex` | ✅ |
+| Сбер | `sber_api` | `career_sber` | ✅ (волна A / Leo) |
+| Альфа-Банк | `alfa_api` | `career_alfa` | ✅ (волна A / Leo) |
+| Wildberries | `wb_api` | `career_wb` | ✅ (волна A / Leo) |
+| МТС | `mts_api` | `career_mts` | ✅ (волна A / Leo) |
+| Авито | `html_list` | `career_avito` | ✅ |
+| VK | `html_list` | `career_vk` | ✅ |
+| Т-Банк | `html_list` | `career_tbank` | ✅ |
+| Ozon | `html_list` | — | ❌ antibot |
+
+### Telegram (`data/tg_job_channels.yaml`)
+
+- **must (7):** `forproducts`, `forchiefs`, `nrgjobs`, `HRity`, `yojob`, `vacanciesbest`, `peersjobboard`
+- **optional (3):** `pm_jobs`, `digital_jobs`, `startupjobs`
+
+### Talks / CFP (не jobs)
+
+- Seed площадок: `talk_places.yaml` → `talk_places_seed`
+- Open CFP monitor: `open_cfp` (M5)
+- Discovery: `cfp_discovery` (M6)
+
+### Backlog рынка
+
+- Ozon — после antibot.
+- Getmatch: публичный search API вместо TG-прокси, если откроют.
+- Следующие борды (не в коде): Работа.ру, Zarplata.ru, Geekjob, Wellfound / LinkedIn (с оговорками ToS).
 
 ## 10. Открытые вопросы
 - Ozon — после antibot-решения.
@@ -72,3 +105,4 @@ class JobConnector(Protocol):
 
 ## 11. Статус
 **M7a–d в коде** и в `default_job_connectors()`.
+Волна A career JSON (Alfa/WB/Sber/MTS) — `362aed5`, на стенде.

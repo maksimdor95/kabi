@@ -117,8 +117,14 @@ async def _save_drafts(
     for draft in drafts:
         key = (draft.source, draft.external_id)
         desc = draft.description or ""
+        # Теги — только в meta.topics (не в текст карточки «Суть»).
+        meta = dict(draft.meta or {})
         if draft.tags:
-            desc = (desc + "\nТемы: " + ", ".join(draft.tags)).strip()
+            topics = [str(t) for t in (meta.get("topics") or []) if t]
+            for tag in draft.tags:
+                if tag and tag not in topics:
+                    topics.append(tag)
+            meta["topics"] = topics
 
         if key in existing_map and upsert:
             opp = existing_map[key]
@@ -136,8 +142,8 @@ async def _save_drafts(
             if draft.url and draft.url != opp.url:
                 opp.url = draft.url
                 changed = True
-            if draft.meta and draft.meta != (opp.meta or {}):
-                opp.meta = draft.meta
+            if meta and meta != (opp.meta or {}):
+                opp.meta = meta
                 changed = True
             if changed:
                 text = draft.to_text()
@@ -164,7 +170,7 @@ async def _save_drafts(
             url=draft.url,
             source=draft.source,
             external_id=draft.external_id,
-            meta=draft.meta or None,
+            meta=meta or None,
         )
         session.add(opp)
         text = draft.to_text()

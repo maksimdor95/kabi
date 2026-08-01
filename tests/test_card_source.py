@@ -32,7 +32,7 @@ def test_format_card_employer_and_snippet_no_source_accent():
         opp_type="job",
         description=(
             "Руководить продуктовой командой, формировать roadmap и метрики роста. "
-            "Опыт в marketplace обязателен."
+            "Опыт в marketplace обязателен.\nТемы: career_site, avito"
         ),
     )
     text = format_card(item)
@@ -40,8 +40,27 @@ def test_format_card_employer_and_snippet_no_source_accent():
     assert "💰 от 500 000 RUB" in text
     assert "<b>Суть:</b>" in text
     assert "roadmap" in text
+    assert "Темы:" not in text
+    assert "career_site" not in text
     assert "<b>Почему ты:</b>" in text
     assert "📡" not in text  # источник не акцентируем
+
+
+def test_card_keyboard_draft_callback_and_favorites_label():
+    from bot.keyboards import card_keyboard
+
+    kb = card_keyboard("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+    labels = {btn.text for row in kb.inline_keyboard for btn in row}
+    assert "🔖 Избранное" in labels
+    assert "✍️ Сопроводительное" in labels
+    draft = [
+        btn
+        for row in kb.inline_keyboard
+        for btn in row
+        if btn.text == "✍️ Сопроводительное"
+    ][0]
+    assert draft.callback_data.startswith("draft:")
+    assert not draft.callback_data.startswith("fb:")
 
 
 def test_menu_job_hides_talks():

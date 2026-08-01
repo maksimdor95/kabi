@@ -35,12 +35,12 @@ logger = get_logger("kabi.bot.digest")
 _REACTION_ACK = {
     "up": "👍 Запомнил, буду искать похожее.",
     "down": "👎 Понял, меньше такого.",
-    "save": "🔖 Сохранил в избранное.",
+    "save": "🔖 В избранном. Смотреть: /saved",
     "saved": "🔖 В избранном. Смотреть: /saved",
     "unsave": "Убрал из избранного.",
     "unsaved": "Убрал из избранного.",
-    "hide": "🙈 Скрыл.",
-    "hidden": "🙈 Скрыл.",
+    "hide": "🙈 Скрыл — больше не покажу.",
+    "hidden": "🙈 Скрыл — больше не покажу.",
     "liked": "👍 Запомнил, буду искать похожее.",
     "disliked": "👎 Понял, меньше такого.",
 }
@@ -158,7 +158,7 @@ async def on_saved(message: Message) -> None:
 
     if not items:
         await message.answer(
-            "В избранном пока пусто. В /today нажми «🔖 Сохранить» на карточке. "
+            "В избранном пока пусто. В /today нажми «🔖 Избранное» на карточке. "
             "Убрать — в /saved кнопка «🗑️ Убрать»."
         )
         return
@@ -229,6 +229,14 @@ async def on_feedback(callback: CallbackQuery) -> None:
             await callback.message.edit_reply_markup(reply_markup=None)
         except Exception:
             pass
+        if result.effect in ("hidden", "hide"):
+            try:
+                await callback.message.edit_text(
+                    "🙈 <i>Скрыто — больше не покажу эту вакансию.</i>",
+                    parse_mode="HTML",
+                )
+            except Exception:
+                pass
         return
 
     if result.effect == "saved":
@@ -247,7 +255,7 @@ async def on_draft(callback: CallbackQuery) -> None:
         await callback.answer("Не понял карточку")
         return
 
-    await callback.answer("Готовлю черновик…")
+    await callback.answer("Готовлю сопроводительное…")
     async with get_session() as session:
         try:
             mid = uuid.UUID(match_id)
@@ -280,9 +288,12 @@ async def on_draft(callback: CallbackQuery) -> None:
             return
         await session.commit()
 
-    kind = "заявки / питча" if (opp.type or "") == "talk" else "отклика"
+    if (opp.type or "") == "talk":
+        header = "<b>Черновик заявки / питча</b> — проверь и отправь сам:"
+    else:
+        header = "<b>Сопроводительное письмо</b> — проверь и отправь сам:"
     await callback.message.answer(
-        f"<b>Черновик {kind}</b> — проверь и отправь сам:\n\n{text}",
+        f"{header}\n\n{text}",
         parse_mode="HTML",
         disable_web_page_preview=True,
     )

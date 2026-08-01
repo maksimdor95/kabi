@@ -15,7 +15,8 @@
 **Сделано:** M1–M6b + **M8** (evals подборки и «почему ты»).
 
 **Сейчас следующий:** **M9** — диалог-советник.
-M7 (TG + career + Getmatch + Habr) и M8 (evals) закрыты; пул `jobs_m7_v2`.
+M7 (TG + career API-волна A + Getmatch + Habr) и M8 (evals) закрыты; пул `jobs_m7_v2`.
+Карта источников: [`docs/services/ingestion.md`](docs/services/ingestion.md) §9.
 
 **Потом:** M10 Alembic → M11 Mini App.
 
@@ -33,7 +34,7 @@ M7 (TG + career + Getmatch + Habr) и M8 (evals) закрыты; пул `jobs_m7
 | **M5** | Монитор известных CFP-URL (`open_cfp.yaml`) | ✅ |
 | **M6** | Discovery CFP по региону/нише | ✅ |
 | **M6b** | Настраиваемое расписание рассылок | ✅ |
-| **M7** | Источники вакансий: TG + career + Getmatch + Habr | ✅ |
+| **M7** | Источники: HH, SJ, TG, Habr, Getmatch + career (Яндекс/Сбер/Альфа/WB/МТС API, Авито/VK/Т-Банк HTML) | ✅ |
 | **M8** | Evals: подборка + «почему ты» — [`docs/services/evals.md`](docs/services/evals.md) | ✅ |
 | **M9** | Диалог «как менеджер» после онбординга (не болталка, а советник) | — |
 | **M10** | Alembic вместо `create_all` + ручных `ALTER` | — |
