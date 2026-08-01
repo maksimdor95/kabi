@@ -1,13 +1,36 @@
 # Каналы вакансий в Telegram (M7a).
 # Публичные читаем через https://t.me/s/<username> — бота в админы НЕ нужно.
 # Закрытый канал: добавь @YouUkabi_bot админом (иначе коннектор не увидит посты).
+#
+# Все 23 — must (каталог жены + прежние must).
+# Группы/чаты/боты и явный шум — в комментариях «не берём».
+# hirify.me — не канал; подключение: docs/services/ingestion.md § Hirify.
 
 channels:
-  # --- must (подписки пользователя) ---
   - username: forproducts
     title: Job for Products and Projects
     priority: must
     notes: Product / PO / CPO
+  - username: productjobgo
+    title: Вакансии для продакт-менеджеров
+    priority: must
+    notes: Product jobs (SKoloskov / FreshProductGo)
+  - username: hireproproduct
+    title: Hire ProProduct
+    priority: must
+    notes: Product / project vacancies
+  - username: peersjobboard
+    title: Peers Jobs
+    priority: must
+    notes: Senior/executive — стратегия, продукт, ИИ (@peersmedia)
+  - username: careerfedoroff
+    title: Fedoroff | ТОП специалисты
+    priority: must
+    notes: Управленцы и топы
+  - username: jobinspb
+    title: Топовые вакансии | Петр Липов
+    priority: must
+    notes: Топ-вакансии 300К+
   - username: forchiefs
     title: Job for Chiefs
     priority: must
@@ -19,39 +42,76 @@ channels:
   - username: HRity
     title: HRity
     priority: must
-    notes: IT/digital, модерация
+    notes: IT/digital, модерация (не путать с hirify.me)
   - username: yojob
     title: Dream Job
     priority: must
-    notes: Крупные компании
+    notes: Крупные компании / dreamjob.ru
   - username: vacanciesbest
     title: Лучшие вакансии
     priority: must
     notes: Курируемый агрегат
-  - username: peersjobboard
-    title: Peers Jobs
+  - username: hcareers_jobs
+    title: Эйч Вакансии
     priority: must
-    notes: Senior/executive — стратегия, продукт, ИИ (@peersmedia)
-
-  # --- optional ---
+    notes: h.careers
+  - username: budujobs
+    title: БУДУ
+    priority: must
+    notes: budu.jobs
   - username: pm_jobs
     title: PM jobs
-    priority: optional
+    priority: must
     notes: Project/Product managers
   - username: digital_jobs
     title: Digital jobs
-    priority: optional
+    priority: must
     notes: Digital + product
   - username: startupjobs
     title: Startup jobs
-    priority: optional
+    priority: must
     notes: Стартапы
+  - username: startupfellows
+    title: StartupFellows
+    priority: must
+    notes: Стартапы + база резюме
+  - username: careerspace
+    title: careerspace
+    priority: must
+    notes: Карьерный чат/канал
+  - username: Remoteit
+    title: Remote IT (Inflow)
+    priority: must
+    notes: Удалёнка IT (шум режет relevance_any)
+  - username: remotegeekjob
+    title: RemoteGeekjob
+    priority: must
+    notes: Remote IT/Digital
+  - username: remote_w0rk
+    title: Удаленка
+    priority: must
+    notes: Общий remote-канал
+  - username: IT_jobs_apply
+    title: IT / Tech jobs
+    priority: must
+    notes: Топ IT/Tech
+  - username: projects_jobs
+    title: Projects Jobs
+    priority: must
+    notes: PM / PMP — группа; product через relevance_any
+
+  # --- сознательно не берём ---
+  # jobospherechat — фриланс-чат (группа, шум)
+  # FreeWorkFeed — фриланс-заказы
+  # foranalysts — аналитики (CPO-фильтр отсекает)
+  # uptume — молодёжный карьерный проект
+  # studyqa — стажировки/учёба за рубежом
+  # it_lifestyle_bot — бот, не канал (t.me/s не читает)
 
 # Сколько последних постов читать с канала за один fetch
 posts_per_channel: 25
 
 # Ключевые слова в тексте поста — иначе отбрасываем (шум продаж/junior).
-# Пустой список = не фильтровать по тексту (только дедуп).
 relevance_any:
   - product
   - продукт
@@ -63,4 +123,7 @@ relevance_any:
   - "product manager"
   - директор по продукту
   - руководитель продукта
+  - руководитель направления
   - chief product
+  - "head of"
+  - CPO

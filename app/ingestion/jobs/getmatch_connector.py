@@ -14,6 +14,7 @@ from html import unescape
 
 import httpx
 
+from app.ingestion.jobs.tg_proxy import tg_http_proxy
 from app.ingestion.schemas import OpportunityDraft
 from app.observability.logging import get_logger
 
@@ -169,10 +170,12 @@ class GetmatchConnector:
             if extra.lower() not in {r.lower() for r in relevance}:
                 relevance.append(extra)
 
+        proxy = tg_http_proxy()
         async with httpx.AsyncClient(
             timeout=35.0,
             headers={"User-Agent": _UA, "Accept-Language": "ru,en;q=0.8"},
             follow_redirects=True,
+            proxy=proxy,
         ) as client:
             try:
                 resp = await client.get(_TG_URL)

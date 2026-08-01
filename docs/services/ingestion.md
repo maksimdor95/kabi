@@ -84,8 +84,36 @@ class JobConnector(Protocol):
 
 ### Telegram (`data/tg_job_channels.yaml`)
 
-- **must (7):** `forproducts`, `forchiefs`, `nrgjobs`, `HRity`, `yojob`, `vacanciesbest`, `peersjobboard`
-- **optional (3):** `pm_jobs`, `digital_jobs`, `startupjobs`
+- **must (23):** `forproducts`, `productjobgo`, `hireproproduct`, `peersjobboard`,
+  `careerfedoroff`, `jobinspb`, `forchiefs`, `nrgjobs`, `HRity`, `yojob`,
+  `vacanciesbest`, `hcareers_jobs`, `budujobs`, `pm_jobs`, `digital_jobs`,
+  `startupjobs`, `startupfellows`, `careerspace`, `Remoteit`, `remotegeekjob`,
+  `remote_w0rk`, `IT_jobs_apply`, `projects_jobs`
+- **Не берём:** фриланс (`jobospherechat`, `FreeWorkFeed`), `foranalysts`,
+  `uptume`, `studyqa`, боты (`it_lifestyle_bot`).
+- **Сеть:** с ВМ `t.me` недоступен без `TG_HTTP_PROXY` (SOCKS5/HTTP EU).
+  Коннекторы `tg_connector` и `getmatch_connector` читают `settings.tg_http_proxy`.
+  Для Proxy6 обычно нужен `socks5://user:pass@host:port` (не `http://` —
+  CONNECT к HTTPS часто timeout).
+
+### Hirify.me — как подключить
+
+Hirify — мета-агрегатор ~900 TG + career sites. **Публичного API/RSS нет.**
+В [Terms](https://hirify.me/terms-of-service) прямо запрещены: запросы к
+internal API, боты/скрипты, scraping.
+
+Легитимные варианты (по приоритету):
+
+1. **Не дублировать сайт** — поднять TG-прокси и наш каталог 23 каналов:
+   большая часть пересекается с источниками Hirify; плюс наши career/HH/SJ.
+2. **Официальный фид** — написать `ai@hirify.me` / фаундеру: личный webhook
+   или partner API под CPO-фильтр (единственный чистый путь в продукт).
+3. **Их Telegram alerts** — на hirify.me Save filter (CPO/HoP) → алерты в TG.
+   Дальше: либо читать глазами, либо форвард в свой канал + наш `tg_connector`
+   (костыль; не «коннектор Hirify»).
+4. **Парсить hirify.me** — нарушает ToS, не делаем.
+
+Отдельный `hirify_connector` в код не кладём, пока нет партнёрского доступа.
 
 ### Talks / CFP (не jobs)
 
@@ -97,11 +125,17 @@ class JobConnector(Protocol):
 
 - Ozon — после antibot.
 - Getmatch: публичный search API вместо TG-прокси, если откроют.
+- **Hirify.me** — без публичного API (ToS запрещает scrape); путь: партнёрский
+  фид или опора на наш TG-каталог после прокси. Не путать с каналом `HRity`.
 - Следующие борды (не в коде): Работа.ру, Zarplata.ru, Geekjob, Wellfound / LinkedIn (с оговорками ToS).
 
 ## 10. Открытые вопросы
 - Ozon — после antibot-решения.
+- **TG/Getmatch с ВМ:** задать `TG_HTTP_PROXY` (EU SOCKS5/HTTP) в `.env` на
+  стенде; без него каналы в yaml не наполняют БД. Проверка:
+  `curl -m 15 -I --proxy "$TG_HTTP_PROXY" https://t.me/s/forproducts` → 200.
 - Getmatch: если откроют публичный search API — заменить TG-прокси.
+- Hirify.me: только партнёрский фид / webhook; scrape не делаем (ToS).
 
 ## 11. Статус
 **M7a–d в коде** и в `default_job_connectors()`.

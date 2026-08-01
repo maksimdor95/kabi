@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     superjob_town: int = 4  # Москва в справочнике SuperJob
     ingestion_keyword_limit: int = 5
     ingestion_per_keyword: int = 30
+    # HTTPS/SOCKS5 прокси для t.me (TG-каналы + Getmatch). Пример:
+    # socks5://user:pass@host:port  или  http://user:pass@host:port
+    tg_http_proxy: str = ""
 
     # LinkedIn enrichment bypass (осознанное нарушение ToS; personal MVP)
     # li_at — cookie сессии из браузера (Application → Cookies → linkedin.com → li_at)

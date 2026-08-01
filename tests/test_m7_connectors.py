@@ -83,8 +83,24 @@ _FIXTURE_HABR_HTML = """
 
 def test_tg_config_has_must_channels():
     cfg = load_tg_config()
-    names = {c["username"] for c in cfg["channels"]}
-    assert {"forproducts", "forchiefs", "nrgjobs", "HRity", "peersjobboard"} <= names
+    channels = [c for c in cfg["channels"] if isinstance(c, dict) and c.get("username")]
+    names = {c["username"] for c in channels}
+    assert len(channels) == 23
+    assert all(c.get("priority") == "must" for c in channels)
+    assert {
+        "forproducts",
+        "productjobgo",
+        "hireproproduct",
+        "peersjobboard",
+        "careerfedoroff",
+        "jobinspb",
+        "HRity",
+        "budujobs",
+        "projects_jobs",
+    } <= names
+    assert "foranalysts" not in names
+    assert "jobospherechat" not in names
+    assert "studyqa" not in names
 
 
 def test_parse_channel_keeps_product_drops_courier():
@@ -303,3 +319,12 @@ def test_default_connectors_include_m7bd():
     assert "getmatch.ru" in sources
     assert "career.habr.com" in sources
     assert "career_sites" in sources
+
+
+def test_tg_http_proxy_reads_settings(monkeypatch):
+    from app.ingestion.jobs import tg_proxy
+
+    monkeypatch.setattr(tg_proxy.settings, "tg_http_proxy", "  socks5://u:p@h:1  ")
+    assert tg_proxy.tg_http_proxy() == "socks5://u:p@h:1"
+    monkeypatch.setattr(tg_proxy.settings, "tg_http_proxy", "")
+    assert tg_proxy.tg_http_proxy() is None

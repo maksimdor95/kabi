@@ -17,6 +17,7 @@ from urllib.parse import unquote
 import httpx
 import yaml
 
+from app.ingestion.jobs.tg_proxy import tg_http_proxy
 from app.ingestion.schemas import OpportunityDraft
 from app.observability.logging import get_logger
 
@@ -160,13 +161,19 @@ class TelegramJobsConnector:
                 relevance.append(kw)
 
         out: list[OpportunityDraft] = []
-        # Короткий timeout: с части облаков t.me/s долго висит и раньше
-        # блокировал сохранение HH/SJ (ингестия ждала все каналы).
-        timeout = httpx.Timeout(8.0, connect=4.0)
+        # Короткий timeout без прокси: с части облаков t.me/s долго висит.
+        # С SOCKS/HTTP-прокси connect чуть дольше — даём запас.
+        proxy = tg_http_proxy()
+        timeout = (
+            httpx.Timeout(20.0, connect=10.0)
+            if proxy
+            else httpx.Timeout(8.0, connect=4.0)
+        )
         async with httpx.AsyncClient(
             timeout=timeout,
             headers={"User-Agent": _UA},
             follow_redirects=True,
+            proxy=proxy,
         ) as client:
             for ch in channels:
                 if not isinstance(ch, dict):
