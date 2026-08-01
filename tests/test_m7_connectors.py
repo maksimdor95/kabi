@@ -128,9 +128,124 @@ def test_career_yaml_lists_bigtech():
     cfg = load_career_config()
     ids = {s["id"] for s in cfg["sites"]}
     assert {"yandex", "sber", "tbank", "avito", "vk", "alfa", "ozon", "mts", "wildberries"} <= ids
+    by_id = {s["id"]: s for s in cfg["sites"]}
     enabled = {s["id"] for s in cfg["sites"] if s.get("enabled", True)}
     assert "avito" in enabled and "vk" in enabled and "yandex" in enabled
-    assert "sber" not in enabled  # SPA без SSR
+    assert {"sber", "alfa", "mts", "wildberries"} <= enabled
+    assert by_id["alfa"]["kind"] == "alfa_api"
+    assert by_id["wildberries"]["kind"] == "wb_api"
+    assert by_id["sber"]["kind"] == "sber_api"
+    assert by_id["mts"]["kind"] == "mts_api"
+    assert "ozon" not in enabled
+
+
+def test_parse_alfa_wb_sber_mts_payloads():
+    """Офлайн-парсинг JSON-ответов волны A (без сети)."""
+    import asyncio
+
+    from app.ingestion.jobs import career_sites_connector as csc
+
+    async def _run() -> None:
+        class FakeResp:
+            def __init__(self, data, status=200):
+                self.status_code = status
+                self._data = data
+
+            def json(self):
+                return self._data
+
+        class FakeClient:
+            def __init__(self, router):
+                self.router = router
+
+            async def get(self, url, params=None, headers=None):
+                return FakeResp(self.router(url, params or {}))
+
+        # Alfa
+        alfa_client = FakeClient(
+            lambda url, p: {
+                "total": 1,
+                "items": [
+                    {
+                        "id": "36532",
+                        "name": "GenAI Product",
+                        "slug": "/moskva/client-service/genai-product_36532",
+                        "descriptionText": "Продукт на LLM",
+                    }
+                ],
+            }
+        )
+        alfa = await csc._fetch_alfa(alfa_client, {"ssl_verify": True}, ["product"])
+        assert len(alfa) == 1
+        assert alfa[0].source == "career_alfa"
+        assert alfa[0].external_id == "36532"
+        assert "alfabank" in (alfa[0].url or "")
+
+        # WB
+        wb_client = FakeClient(
+            lambda url, p: {
+                "data": {
+                    "items": [
+                        {
+                            "id": 99,
+                            "name": "Product Lead",
+                            "city_title": "Москва",
+                            "direction_title": "Product",
+                            "employment_types": [{"title": "Удалённо"}],
+                        }
+                    ]
+                }
+            }
+        )
+        wb = await csc._fetch_wb(wb_client, {}, ["product", "lead"])
+        assert len(wb) == 1
+        assert wb[0].source == "career_wb"
+        assert wb[0].remote is True
+
+        # Sber
+        sber_client = FakeClient(
+            lambda url, p: {
+                "data": {
+                    "total": 1,
+                    "vacancies": [
+                        {
+                            "internalId": 4543221,
+                            "title": "AI Developer",
+                            "company": "Сбер",
+                            "city": "Москва",
+                            "introduction": "Python и product AI",
+                        }
+                    ],
+                }
+            }
+        )
+        sber = await csc._fetch_sber(sber_client, {}, ["product", "developer"])
+        assert len(sber) == 1
+        assert sber[0].source == "career_sber"
+
+        # MTS
+        mts_client = FakeClient(
+            lambda url, p: {
+                "data": [
+                    {
+                        "title": "Руководитель продукта",
+                        "slug": "rukovoditel-produkta",
+                        "documentId": "doc1",
+                        "organization": {"title": "МТС"},
+                        "region": {"title": "Москва"},
+                        "categories": [{"title": "Product"}],
+                        "workFormats": [{"title": "Гибрид"}],
+                    }
+                ],
+                "meta": {"pagination": {"pageCount": 1}},
+            }
+        )
+        mts = await csc._fetch_mts(mts_client, {}, ["продукт", "руководитель"])
+        assert len(mts) == 1
+        assert mts[0].source == "career_mts"
+        assert mts[0].remote is True
+
+    asyncio.run(_run())
 
 
 def test_getmatch_keeps_product_drops_courier():

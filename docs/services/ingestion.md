@@ -19,9 +19,11 @@ class JobConnector(Protocol):
 # M7a: tg_connector + data/tg_job_channels.yaml
 # M7b: getmatch_connector (TG g_jobchannel → getmatch.ru/vacancies/{id})
 # M7c: career_sites_connector + data/career_sites.yaml
+#      yandex_api | alfa_api | wb_api | sber_api | mts_api | html_list
 # M7d: habr_connector (RSS + HTML vacancy-card)
 ```
 Коннектор возвращает `OpportunityDraft`; runner маппит в ORM, дедуп, эмбеддинги.
+Теги draft → `meta.topics` (не дописываются в description как «Темы: …»).
 
 ## 4. Входы / Выходы
 - **Вход:** внешние API/RSS/страницы; ключевые слова из профиля.
@@ -57,14 +59,15 @@ class JobConnector(Protocol):
 - **M2:** HeadHunter + SuperJob.
 - **M7a ✅:** TG из `data/tg_job_channels.yaml` (в т.ч. `peersjobboard`).
 - **M7b ✅:** Getmatch через `g_jobchannel` (`source=getmatch.ru`).
-- **M7c ✅:** `data/career_sites.yaml` — Яндекс API; Avito/VK/T-Bank HTML с
-  `path_regex`; Sber/Alfa/Ozon/MTS/WB выкл. (SPA/403/SSL) до стабильного API.
+- **M7c ✅:** `data/career_sites.yaml` — Яндекс + **Alfa/WB/Sber/MTS JSON API**
+  (порт волны A из Leo); Avito/VK/T-Bank HTML; Ozon выкл. (antibot).
+  Source WB: `career_wb` (лейбл Wildberries).
 - **M7d ✅:** Хабр Карьера RSS (+ HTML fallback), `source=career.habr.com`.
 - **Talks seed:** `talk_places.yaml` сужен — массовые СМИ `enabled: false`,
   в питч идут product-релевантные площадки (vc, cnews, skillfactory…).
 
 ## 10. Открытые вопросы
-- Включить Sber/Alfa/Ozon, когда появится публичный JSON/SSR.
+- Ozon — после antibot-решения.
 - Getmatch: если откроют публичный search API — заменить TG-прокси.
 
 ## 11. Статус

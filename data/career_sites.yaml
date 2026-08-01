@@ -1,6 +1,6 @@
 # Карьерные сайты компаний (M7c). Публичный HTML/JSON, без логина.
 # kind:
-#   yandex_api — JSON https://yandex.ru/jobs/api/publications
+#   yandex_api | alfa_api | wb_api | sber_api | mts_api — JSON (волна A из Leo)
 #   html_list  — листинг HTML; path_regex / path_exclude уточняют ссылки
 
 sites:
@@ -13,13 +13,9 @@ sites:
 
   - id: sber
     name: Сбер
-    kind: html_list
-    # SPA без вакансий в SSR — оставляем выкл. до появления стабильного API.
-    enabled: false
-    list_url: https://rabota.sber.ru/search/?query=%D0%BF%D1%80%D0%BE%D0%B4%D1%83%D0%BA%D1%82
-    link_contains:
-      - /vacancy
-      - /vacancies
+    kind: sber_api
+    enabled: true
+    list_url: https://rabota.sber.ru/public/app-candidate-public-api-gateway/api/v1/publications
 
   - id: tbank
     name: Т-Банк
@@ -55,19 +51,16 @@ sites:
 
   - id: alfa
     name: Альфа-Банк
-    kind: html_list
-    # SSR почти пустой + битый SSL на части окружений.
-    enabled: false
+    kind: alfa_api
+    enabled: true
+    # TLS: self-signed intermediate на части окружений
     ssl_verify: false
-    list_url: https://job.alfabank.ru/vacancies
-    link_contains:
-      - vacancy
-      - vacancies
+    list_url: https://job.alfabank.ru/api/vacancies
 
   - id: ozon
     name: Ozon
     kind: html_list
-    # Часто 403 без браузерного fingerprint.
+    # Antibot redirect loop — backlog (как в Leo).
     enabled: false
     list_url: https://job.ozon.ru/
     link_contains:
@@ -77,23 +70,16 @@ sites:
 
   - id: mts
     name: МТС
-    kind: html_list
-    # Листинг отдаёт category-URL (?cat=), не карточки вакансий.
-    enabled: false
-    list_url: https://job.mts.ru/vacancies
-    link_contains:
-      - /vacancy
-      - /vacancies/
+    kind: mts_api
+    enabled: true
+    list_url: https://job.mts.ru/api/v2/vacancies
+
   - id: wildberries
     name: Wildberries
-    kind: html_list
-    # SSR без карточек вакансий.
-    enabled: false
-    list_url: https://career.wb.ru/
-    link_contains:
-      - vacancy
-      - vacancies
-      - job
+    kind: wb_api
+    enabled: true
+    api_base: https://career.rwb.ru
+    list_url: https://career.rwb.ru/crm-api/api/v1/pub/vacancies
 
 # Фильтр по тексту ссылки/якоря (роли профиля CPO/HoP).
 title_relevance_any:

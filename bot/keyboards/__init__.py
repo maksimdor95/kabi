@@ -118,13 +118,19 @@ def _fmt_salary(salary: dict | None) -> str | None:
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
+# Служебный хвост ingestion (старые записи): «Темы: career_site, avito».
+_TOPICS_TAIL_RE = re.compile(
+    r"(?:\n|\s)*Темы\s*:\s*[^\n]*$",
+    re.I,
+)
 
 
 def _snippet(text: str | None, *, limit: int = 320) -> str | None:
     """Короткая выжимка описания (для карточки без перехода на HH)."""
     if not text:
         return None
-    clean = _TAG_RE.sub(" ", text)
+    clean = _TOPICS_TAIL_RE.sub("", text)
+    clean = _TAG_RE.sub(" ", clean)
     clean = _WS_RE.sub(" ", clean).strip()
     if len(clean) < 40:
         return None
@@ -150,6 +156,7 @@ _SOURCE_LABELS: dict[str, str] = {
     "career_alfa": "Альфа-Банк · карьера",
     "career_ozon": "Ozon · карьера",
     "career_mts": "МТС · карьера",
+    "career_wb": "Wildberries · карьера",
     "career_wildberries": "Wildberries · карьера",
     "career_sites": "Карьерный сайт",
     "tg_jobs": "Telegram",
@@ -245,7 +252,7 @@ def card_keyboard(match_id: str, *, saved: bool = False) -> InlineKeyboardMarkup
     save_btn = (
         InlineKeyboardButton(text="🗑️ Убрать", callback_data=cb("unsave"))
         if saved
-        else InlineKeyboardButton(text="🔖 Сохранить", callback_data=cb("save"))
+        else InlineKeyboardButton(text="🔖 Избранное", callback_data=cb("save"))
     )
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -258,7 +265,11 @@ def card_keyboard(match_id: str, *, saved: bool = False) -> InlineKeyboardMarkup
                 InlineKeyboardButton(text="🙈 Скрыть", callback_data=cb("hide")),
             ],
             [
-                InlineKeyboardButton(text="✍️ Черновик", callback_data=cb("draft")),
+                # draft: — отдельный хендлер (не fb:), иначе «Уже неактуально».
+                InlineKeyboardButton(
+                    text="✍️ Сопроводительное",
+                    callback_data=f"draft:{match_id}",
+                ),
             ],
         ]
     )
