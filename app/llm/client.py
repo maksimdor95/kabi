@@ -67,20 +67,16 @@ def _track(data: dict[str, Any]) -> None:
     )
 
 
-async def complete(
-    prompt: str,
+async def complete_messages(
+    messages: list[dict[str, str]],
     *,
-    system: str | None = None,
     tier: Tier = "primary",
     temperature: float = 0.3,
     max_tokens: int = 2000,
 ) -> str:
-    """Запрос к чат-модели выбранного уровня. Возвращает текст ответа."""
-    messages: list[dict[str, str]] = []
-    if system:
-        messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": prompt})
-
+    """Запрос к чат-модели с готовым списком messages (system/user/assistant)."""
+    if not messages:
+        raise LLMError("complete_messages: пустой messages")
     data = await _post(
         "chat/completions",
         {
@@ -95,6 +91,24 @@ async def complete(
         return data["choices"][0]["message"]["content"]
     except (KeyError, IndexError) as exc:
         raise LLMError(f"Неожиданный ответ chat/completions: {data}") from exc
+
+
+async def complete(
+    prompt: str,
+    *,
+    system: str | None = None,
+    tier: Tier = "primary",
+    temperature: float = 0.3,
+    max_tokens: int = 2000,
+) -> str:
+    """Запрос к чат-модели выбранного уровня. Возвращает текст ответа."""
+    messages: list[dict[str, str]] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    return await complete_messages(
+        messages, tier=tier, temperature=temperature, max_tokens=max_tokens
+    )
 
 
 async def complete_json(

@@ -1,12 +1,13 @@
 """Ядро «менеджера»: онбординг и диалог.
 
-Спека: docs/services/dialogue-agent.md  (этап M1)
+Спека: docs/services/dialogue-agent.md  (M1 онбординг + M9 советник)
 Онбординг ведётся по шагам через profile.onboarding_step.
+Свободный чат: windowed history + advisor tools.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +17,8 @@ from app.enrichment.base import (
     format_signals_summary,
     signals_to_profile_patch,
 )
+from app.services import advisor_tools
+from app.services import dialog_memory
 from app.services import profile as profile_service
 from app.services.onboarding import (
     STEPS,
@@ -27,9 +30,14 @@ from app.services.onboarding import (
 
 _MANAGER_PERSONA = (
     "Ты — персональный карьерный менеджер пользователя (как менеджер у звезды). "
-    "Ты знаешь его профиль и общаешься тепло, по делу, проактивно. "
-    "Не выдумывай факты о пользователе. Не составляй утренние планёры и to-do на день, "
-    "если тебя об этом прямо не просят — твоя зона: карьера, вакансии, выступления. "
+    "Общаешься тепло, по делу, коротко. "
+    "Не выдумывай факты о пользователе — только профиль и данные из блока инструментов. "
+    "Не выдумывай вакансии, компании, CFP и дедлайны: если в инструментах пусто — "
+    "скажи честно и предложи /today, /talks или /pitch. "
+    "Не пиарь масс-медиа и ТВ evergreen (НТВ, утренние шоу и т.п.) — зона: продукт, "
+    "релевантные конференции/CFP и питч только если пользователь просит. "
+    "Не составляй утренние планёры и to-do на день, если тебя об этом прямо не просят — "
+    "твоя зона: карьера, вакансии, выступления. "
     "Обращайся нейтрально по роду (без «ты занята» / «ты готова»)."
 )
 
@@ -310,6 +318,7 @@ async def handle_message(session: AsyncSession, user: User, text: str) -> AgentR
         )
 
     if is_restart_request(text):
+        await dialog_memory.clear(user.id)
         return await start_onboarding(session, profile)
 
     if profile.onboarding_step < len(STEPS):
@@ -334,16 +343,48 @@ async def handle_message(session: AsyncSession, user: User, text: str) -> AgentR
     if junk and not useful:
         return AgentReply(text=_ASK_PROFILE_LINK)
 
-    return await _free_chat(profile, text)
+    return await _free_chat(session, profile, text)
 
 
-async def _free_chat(profile: Profile, text: str) -> AgentReply:
+def _build_advisor_messages(
+    *,
+    profile: Profile,
+    history: list[dict[str, str]],
+    tool_context: str,
+    user_text: str,
+) -> list[dict[str, str]]:
+    """Собрать messages для LLM: persona + профиль + tools + история + реплика."""
+    context = profile_service.profile_to_text(profile)
+    system_parts = [_MANAGER_PERSONA, f"Краткий профиль:\n{context or '(пусто)'}"]
+    if tool_context:
+        system_parts.append(
+            "Данные из инструментов (единственный источник фактов по вакансиям/"
+            f"CFP/расписанию):\n{tool_context}"
+        )
+    messages: list[dict[str, str]] = [{"role": "system", "content": "\n\n".join(system_parts)}]
+    for msg in history:
+        role = msg.get("role")
+        content = (msg.get("content") or "").strip()
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": user_text})
+    return messages
+
+
+async def _free_chat(
+    session: AsyncSession, profile: Profile, text: str
+) -> AgentReply:
     from app.llm import client as llm
 
-    context = profile_service.profile_to_text(profile)
-    answer = await llm.complete(
-        f"Профиль пользователя:\n{context}\n\nСообщение пользователя: {text}",
-        system=_MANAGER_PERSONA,
-        tier="primary",
+    history = await dialog_memory.get_history(profile.user_id)
+    tools = advisor_tools.select_tools(text)
+    tool_context = await advisor_tools.run_tools(session, profile, tools)
+    messages = _build_advisor_messages(
+        profile=profile,
+        history=history,
+        tool_context=tool_context,
+        user_text=text,
     )
+    answer = await llm.complete_messages(messages, tier="primary")
+    await dialog_memory.append_turn(profile.user_id, text, answer)
     return AgentReply(text=answer, finished=True)  # finished → оставить главное меню

@@ -23,9 +23,10 @@ M1.
 
 ## 3. Публичный интерфейс
 ```python
-async def complete(prompt: Prompt, *, tier: Literal["primary","cheap"]="primary") -> str: ...
-async def embed(text: str) -> Vector: ...
-# app/llm/prompts/ — версионируемые промпты как часть харнесса
+async def complete(prompt, *, system=None, tier="primary"|"cheap") -> str: ...
+async def complete_messages(messages: list[dict], *, tier=...) -> str: ...  # multi-turn (M9)
+async def complete_json(...) -> Any: ...
+async def embed(text, *, kind="doc"|"query") -> list[float]: ...
 ```
 
 ## 4. Входы / Выходы
@@ -69,4 +70,4 @@ async def embed(text: str) -> Vector: ...
 - Суточный лимит токенов/бюджет для контроля OpEx.
 
 ## 11. Статус
-инфра готова (YC SA + ключ + env); код модуля не начат
+инфра + клиент (`complete` / `complete_messages` / `embed`); M9 использует multi-turn.

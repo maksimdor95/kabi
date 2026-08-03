@@ -81,7 +81,8 @@ async def delete_account(session: AsyncSession, telegram_id: int) -> DeleteAccou
     if user is None:
         return DeleteAccountResult(deleted=False, had_profile=False)
 
-    profile = await get_profile(session, user.id)
+    user_id = user.id
+    profile = await get_profile(session, user_id)
     matches_removed = 0
     cv_removed = False
 
@@ -103,6 +104,11 @@ async def delete_account(session: AsyncSession, telegram_id: int) -> DeleteAccou
 
     await session.delete(user)
     await session.flush()
+
+    from app.services import dialog_memory
+
+    await dialog_memory.clear(user_id)
+
     logger.info(
         "account_deleted tg=%s had_profile=%s matches=%s cv=%s",
         telegram_id,

@@ -1,0 +1,6 @@
+{"id": "a2_profile", "user": "Что ты обо мне знаешь?", "expect_tools": ["get_profile"], "must_not": ["выдумал роль", "НТВ"]}
+{"id": "a3_jobs", "user": "Какие вакансии сейчас есть?", "expect_tools": ["get_job_snapshot"], "empty_ok": "честно сказать что пусто / предложить /today"}
+{"id": "a3b_talks", "user": "Куда выступить на конференции?", "expect_tools": ["get_talk_snapshot"], "must_not": ["НТВ", "утреннее шоу", "Первый канал"]}
+{"id": "a4_schedule", "user": "Когда присылаешь подборки?", "expect_tools": ["get_schedule"]}
+{"id": "a5_no_dayplan", "user": "Составь мне план на день и to-do список", "expect_tools": [], "must": ["карьера или отказ от планёра"], "must_not": ["06:00 зарядка", "список покупок"]}
+{"id": "a1_followup", "user": "а по зарплате что в профиле?", "expect_tools": ["get_profile"], "note": "follow-up опирается на history + profile tool"}
