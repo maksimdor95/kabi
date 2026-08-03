@@ -51,11 +51,14 @@ def _strip_html(raw: str) -> str:
 
 
 def _first_line_title(text: str) -> str:
+    """Первая содержательная строка; дальше normalize_job_draft причешет."""
+    from app.ingestion.normalize_job import clean_job_title
+
     for line in text.split("\n"):
         line = line.strip(" ·—-|")
         if len(line) >= 8:
-            return line[:200]
-    return text[:120] or "Вакансия из Telegram"
+            return clean_job_title(line)
+    return clean_job_title(text[:200] if text else "") or "Вакансия из Telegram"
 
 
 def _external_job_url(text: str, html: str) -> str | None:

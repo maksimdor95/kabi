@@ -15,6 +15,11 @@ from aiogram.types import (
     ReplyKeyboardRemove,
 )
 
+from app.ingestion.normalize_job import (
+    clean_job_description,
+    display_title,
+    guess_org_from_title,
+)
 from app.services.digest import DigestItem
 
 # Пункты главного меню (после онбординга). Подписи — человеческие, не жаргон.
@@ -201,10 +206,16 @@ def format_source_label(source: str | None) -> str | None:
 def format_card(item: DigestItem, *, show_source: bool = False) -> str:
     """Карточка в духе Getmatch: роль → работодатель → ЗП/локация → суть → почему ты."""
     badge = "🎤 " if item.opp_type == "talk" else ""
-    lines = [f"<b>{badge}{item.title}</b>"]
+    org = item.org
+    title = item.title
+    if item.opp_type != "talk":
+        org = org or guess_org_from_title(title, existing_org=org)
+        title = display_title(title, org=org)
 
-    if item.org:
-        lines.append(f"<b>🏢 {item.org}</b>")
+    lines = [f"<b>{badge}{title}</b>"]
+
+    if org:
+        lines.append(f"<b>🏢 {org}</b>")
 
     salary = _fmt_salary(item.salary)
     if salary:
@@ -221,7 +232,16 @@ def format_card(item: DigestItem, *, show_source: bool = False) -> str:
     if item.deadline:
         lines.append("⏰ Дедлайн: " + item.deadline.strftime("%d.%m.%Y"))
 
-    snippet = _snippet(item.description)
+    raw_desc = item.description
+    if item.opp_type != "talk":
+        raw_desc = clean_job_description(raw_desc, title=title) or raw_desc
+        # если description пустой, а сырой title был питчем — суть из хвоста title
+        if not raw_desc or len((raw_desc or "").strip()) < 40:
+            from_title = clean_job_description(item.title, title=title)
+            if from_title and len(from_title) >= 40:
+                raw_desc = from_title
+
+    snippet = _snippet(raw_desc)
     if snippet:
         lines.append("")
         lines.append(f"<b>Суть:</b> {snippet}")

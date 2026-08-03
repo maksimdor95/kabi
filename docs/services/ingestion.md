@@ -48,9 +48,12 @@ class JobConnector(Protocol):
   Короткий HTTP timeout (~8s): с части облаков `t.me` висит долго.
 - **Runner jobs:** сохранение после **каждого** коннектора — медленный scrape
   не блокирует уже полученные HH/SJ (иначе `/today` пустой, пока TG таймаутит).
+- **Карточка job:** `normalize_job_draft` перед save — чистый title/org без
+  отсечения вакансий; страховка также в `format_card` для старых записей.
 
 ## 8. Тесты / evals
 - `tests/test_m7_connectors.py` — TG / career / Getmatch / Habr без сети.
+- `tests/test_job_card_normalize.py` — кейс «питч в title» (Физикл и др.).
 - Eval-пул после M7: `evals/matching/pools/jobs_m7_v2.jsonl` (HH + M7 sources).
 
 ## 9. Карта источников (актуально)

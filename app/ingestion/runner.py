@@ -20,6 +20,7 @@ from app.ingestion.jobs.hh_connector import HHConnector
 from app.ingestion.jobs.superjob_connector import SuperJobConnector
 from app.ingestion.jobs.tg_connector import TelegramJobsConnector
 from app.ingestion.keywords import derive_hh_area, derive_keywords
+from app.ingestion.normalize_job import normalize_job_draft
 from app.ingestion.schemas import OpportunityDraft
 from app.ingestion.talks.discover_connector import CfpDiscoveryConnector
 from app.ingestion.talks.open_cfp_connector import OpenCfpConnector
@@ -115,6 +116,7 @@ async def _save_drafts(
     pending: list[tuple[Opportunity, str]] = []
 
     for draft in drafts:
+        normalize_job_draft(draft)
         key = (draft.source, draft.external_id)
         desc = draft.description or ""
         # Теги — только в meta.topics (не в текст карточки «Суть»).
