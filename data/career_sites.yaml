@@ -21,13 +21,20 @@ sites:
     name: Т-Банк
     kind: html_list
     enabled: true
-    list_url: https://www.tbank.ru/career/vacancies/all/moscow/
+    # SPA-каталог all/moscow почти без product; IT-листинги SSR'ят карточки.
+    list_url: https://www.tbank.ru/career/vacancies/it/
+    list_urls:
+      - https://www.tbank.ru/career/vacancies/it/
+      - https://www.tbank.ru/career/it/about/
+      - https://www.tbank.ru/career/vacancies/all/moscow/
     link_contains:
-      - /career/service/vacancy/
-    path_regex: "/career/service/vacancy/[^/]+/[^/]+/[0-9a-f-]{8,}"
+      - /vacancy/
+    # /career/it|service|…/vacancy/{city}/{seo-slug}/{uuid}/
+    path_regex: "/career/[^/]+/vacancy/[^/]+/[^/]+/[0-9a-f-]{8,}"
     path_exclude:
       - operator-rannego
       - predstavitel
+      - operator_rannego
 
   - id: avito
     name: Авито
@@ -85,6 +92,7 @@ sites:
 title_relevance_any:
   - product
   - продукт
+  - produkt
   - продакт
   - cpo
   - "head of"
@@ -94,3 +102,6 @@ title_relevance_any:
   - руководитель
   - manager
   - менеджер
+  - menedzher
+  - timlid
+  - "team lead"

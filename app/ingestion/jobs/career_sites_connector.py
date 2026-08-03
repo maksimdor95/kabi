@@ -1,7 +1,8 @@
 """Коннектор карьерных сайтов компаний (M7c).
 
 Yandex + волна A (Alfa/WB/Sber/MTS) — публичные JSON API (порт из Leo).
-Avito/VK/T-Bank — HTML-листинг. Ozon выкл. (antibot).
+Avito/VK — HTML-листинг. Т-Банк — HTML SSR IT-листингов (каталог all — SPA).
+Ozon выкл. (antibot).
 
 Каталог: data/career_sites.yaml.
 Спека: docs/services/ingestion.md
@@ -479,6 +480,50 @@ _JSON_FETCHERS = {
 # --- HTML -----------------------------------------------------------------------
 
 
+_GENERIC_ANCHORS = {
+    "откликнуться",
+    "подробнее",
+    "смотреть",
+    "открыть",
+    "вакансия",
+    "читать",
+    "далее",
+    "more",
+    "apply",
+    "x",
+    "y",
+    "z",
+}
+
+
+def _title_from_path(path: str, anchor: str) -> str:
+    title = _clean(anchor)
+    if (
+        title
+        and len(title) >= 4
+        and "http" not in title.lower()
+        and title.lower() not in _GENERIC_ANCHORS
+    ):
+        return title[:200]
+    # /career/it/vacancy/moscow/seo-slug/uuid/ → seo-slug
+    parts = [p for p in path.strip("/").split("/") if p]
+    slug = ""
+    if "vacancy" in parts:
+        try:
+            i = parts.index("vacancy")
+            # city then slug then uuid
+            if i + 2 < len(parts):
+                slug = parts[i + 2]
+        except ValueError:
+            slug = ""
+    if not slug:
+        slug = next(
+            (p for p in reversed(parts) if not re.fullmatch(r"[0-9a-f-]{8,}", p, re.I)),
+            path,
+        )
+    return _clean(slug.replace("-", " "))[:200]
+
+
 def parse_html_list(
     html: str,
     *,
@@ -492,13 +537,26 @@ def parse_html_list(
 ) -> list[OpportunityDraft]:
     drafts: list[OpportunityDraft] = []
     seen: set[str] = set()
+    seen_ext: set[str] = set()
     path_re = re.compile(path_regex, re.I) if path_regex else None
     excludes = [e.lower() for e in (path_exclude or []) if e]
+
+    # (full_url, anchor_text) — <a href> + сырые path из JSON/SSR (Т-Банк).
+    candidates: list[tuple[str, str]] = []
     for href, anchor in _HREF_RE.findall(html):
-        href = unescape(href.strip())
-        if href.startswith("#") or href.startswith("javascript:"):
+        candidates.append((unescape(href.strip()), anchor))
+    if path_re is not None:
+        for m in path_re.finditer(html):
+            candidates.append((m.group(0), ""))
+
+    for href, anchor in candidates:
+        if not href or href.startswith("#") or href.startswith("javascript:"):
             continue
         full = urljoin(list_url, href)
+        # нормализуем path-only матчи без схемы
+        if full.startswith("/") and list_url:
+            full = urljoin(list_url, full)
+        full = full.split("?")[0].rstrip("/") + "/"
         low = full.lower()
         path = urlparse(full).path or ""
         if excludes and any(ex in low or ex in path.lower() for ex in excludes):
@@ -508,19 +566,24 @@ def parse_html_list(
                 continue
         elif not any(frag.lower() in low for frag in link_contains):
             continue
-        title = _clean(anchor)
-        if not title or len(title) < 4:
-            parts = [p for p in path.strip("/").split("/") if p and not p.isdigit()]
-            title = _clean((parts[-1] if parts else path).replace("-", " "))
+        title = _title_from_path(path, anchor)
         if len(title) < 4:
             continue
         if not _relevant(title + " " + full, relevance):
             continue
-        if full in seen:
+        uuid_m = re.search(r"/([0-9a-f]{8}-[0-9a-f-]{27,})/?$", path, re.I)
+        nums = re.findall(r"/(\d{3,})/?", path)
+        if uuid_m:
+            ext = uuid_m.group(1)
+        elif nums:
+            ext = nums[-1]
+        else:
+            ext = str(abs(hash(full)) % (10**12))
+        if full in seen or ext in seen_ext:
+            # предпочитаем вариант с человекочитаемым anchor
             continue
         seen.add(full)
-        nums = re.findall(r"/(\d{3,})/?", path)
-        ext = nums[-1] if nums else str(abs(hash(full)) % (10**12))
+        seen_ext.add(str(ext))
         drafts.append(
             OpportunityDraft(
                 type="job",
@@ -570,38 +633,62 @@ class CareerSitesConnector:
                     if fetcher is not None:
                         found = await fetcher(client, site, relevance)
                     else:
-                        list_url = str(site.get("list_url") or "")
-                        if not list_url:
+                        list_urls = [
+                            str(u)
+                            for u in (
+                                site.get("list_urls")
+                                or ([site.get("list_url")] if site.get("list_url") else [])
+                            )
+                            if u
+                        ]
+                        if not list_urls:
                             continue
                         ssl_verify = bool(site.get("ssl_verify", True))
-                        if ssl_verify:
-                            resp = await client.get(list_url)
-                        else:
-                            async with httpx.AsyncClient(
-                                timeout=35.0,
-                                headers={
-                                    "User-Agent": _UA,
-                                    "Accept-Language": "ru,en;q=0.8",
-                                },
-                                follow_redirects=True,
-                                verify=False,
-                            ) as insecure:
-                                resp = await insecure.get(list_url)
-                        if resp.status_code != 200:
-                            logger.warning(
-                                "career %s → HTTP %s", site_id, resp.status_code
+                        found: list[OpportunityDraft] = []
+                        seen_ext: set[str] = set()
+                        for list_url in list_urls:
+                            if ssl_verify:
+                                resp = await client.get(list_url)
+                            else:
+                                async with httpx.AsyncClient(
+                                    timeout=35.0,
+                                    headers={
+                                        "User-Agent": _UA,
+                                        "Accept-Language": "ru,en;q=0.8",
+                                    },
+                                    follow_redirects=True,
+                                    verify=False,
+                                ) as insecure:
+                                    resp = await insecure.get(list_url)
+                            if resp.status_code != 200:
+                                logger.warning(
+                                    "career %s → HTTP %s (%s)",
+                                    site_id,
+                                    resp.status_code,
+                                    list_url,
+                                )
+                                continue
+                            page_drafts = parse_html_list(
+                                resp.text,
+                                site_id=site_id,
+                                company=str(site.get("name") or site_id),
+                                list_url=list_url,
+                                link_contains=list(
+                                    site.get("link_contains") or ["vacancy"]
+                                ),
+                                relevance=relevance,
+                                path_regex=site.get("path_regex"),
+                                path_exclude=list(site.get("path_exclude") or []),
                             )
-                            continue
-                        found = parse_html_list(
-                            resp.text,
-                            site_id=site_id,
-                            company=str(site.get("name") or site_id),
-                            list_url=list_url,
-                            link_contains=list(site.get("link_contains") or ["vacancy"]),
-                            relevance=relevance,
-                            path_regex=site.get("path_regex"),
-                            path_exclude=list(site.get("path_exclude") or []),
-                        )
+                            for d in page_drafts:
+                                if d.external_id in seen_ext:
+                                    continue
+                                seen_ext.add(str(d.external_id))
+                                found.append(d)
+                                if len(found) >= _MAX_PER_SITE:
+                                    break
+                            if len(found) >= _MAX_PER_SITE:
+                                break
                     logger.info("career_%s: %d drafts", site_id, len(found))
                     out.extend(found)
                 except Exception as exc:  # noqa: BLE001

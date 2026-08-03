@@ -153,6 +153,7 @@ _SOURCE_LABELS: dict[str, str] = {
     "superjob.ru": "SuperJob",
     "career.habr.com": "Хабр Карьера",
     "getmatch.ru": "Getmatch",
+    "geekjob.ru": "Geekjob",
     "career_yandex": "Яндекс · карьера",
     "career_sber": "Сбер · карьера",
     "career_tbank": "Т-Банк · карьера",

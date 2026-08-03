@@ -21,6 +21,7 @@ class JobConnector(Protocol):
 # M7c: career_sites_connector + data/career_sites.yaml
 #      yandex_api | alfa_api | wb_api | sber_api | mts_api | html_list
 # M7d: habr_connector (RSS + HTML vacancy-card)
+# M7e: geekjob_connector (listing + JSON-LD)
 ```
 Коннектор возвращает `OpportunityDraft`; runner маппит в ORM, дедуп, эмбеддинги.
 Теги draft → `meta.topics` (не дописываются в description как «Темы: …»).
@@ -70,6 +71,7 @@ class JobConnector(Protocol):
 | 4 | Career sites (см. ниже) | `career_*` | ✅ |
 | 5 | Getmatch (via `g_jobchannel`) | `getmatch.ru` | ✅ |
 | 6 | Хабр Карьера RSS/HTML | `career.habr.com` | ✅ |
+| 7 | Geekjob listing + JSON-LD | `geekjob.ru` | ✅ |
 
 ### Career sites (`data/career_sites.yaml`)
 
@@ -82,7 +84,7 @@ class JobConnector(Protocol):
 | МТС | `mts_api` | `career_mts` | ✅ (волна A / Leo) |
 | Авито | `html_list` | `career_avito` | ✅ |
 | VK | `html_list` | `career_vk` | ✅ |
-| Т-Банк | `html_list` | `career_tbank` | ✅ |
+| Т-Банк | `html_list` (IT+about SSR) | `career_tbank` | ✅ |
 | Ozon | `html_list` | — | ❌ antibot |
 
 ### Telegram (`data/tg_job_channels.yaml`)
@@ -130,7 +132,8 @@ internal API, боты/скрипты, scraping.
 - Getmatch: публичный search API вместо TG-прокси, если откроют.
 - **Hirify.me** — без публичного API (ToS запрещает scrape); путь: партнёрский
   фид или опора на наш TG-каталог после прокси. Не путать с каналом `HRity`.
-- Следующие борды (не в коде): Работа.ру, Zarplata.ru, Geekjob, Wellfound / LinkedIn (с оговорками ToS).
+- Следующие борды (не в коде): Работа.ру, Zarplata.ru, Wellfound / LinkedIn (с оговорками ToS).
+  Geekjob ✅ (`geekjob.ru`).
 
 ## 10. Открытые вопросы
 - Ozon — после antibot-решения.
@@ -141,5 +144,6 @@ internal API, боты/скрипты, scraping.
 - Hirify.me: только партнёрский фид / webhook; scrape не делаем (ToS).
 
 ## 11. Статус
-**M7a–d в коде** и в `default_job_connectors()`.
+**M7a–e в коде** и в `default_job_connectors()` (Geekjob = M7e).
 Волна A career JSON (Alfa/WB/Sber/MTS) — `362aed5`, на стенде.
+Т-Банк: IT SSR + расширенный `path_regex` (не только `/service/`).

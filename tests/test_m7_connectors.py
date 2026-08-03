@@ -140,6 +140,80 @@ def test_parse_html_career_filters_by_title():
     assert drafts[0].external_id == "12345"
 
 
+def test_tbank_path_regex_and_slug_title():
+    html = """
+    <a href="/career/it/vacancy/moscow/timlid-produktovoj-analitiki-ekvajring/b8edbeb0-f104-4d16-ba68-87072deb62a9/">x</a>
+    <a href="/career/service/vacancy/moscow/predstavitel/bc297685-1966-46ec-820a-b47f2a48492b/">y</a>
+    <a href="/career/service/vacancy/moscow/operator-rannego-vzyskaniya/1aff2ffe-dd53-4b21-8cd9-1d63c8633f1a/">z</a>
+    """
+    drafts = parse_html_list(
+        html,
+        site_id="tbank",
+        company="Т-Банк",
+        list_url="https://www.tbank.ru/career/vacancies/it/",
+        link_contains=["/vacancy/"],
+        relevance=["produkt", "product", "lead", "timlid"],
+        path_regex=r"/career/[^/]+/vacancy/[^/]+/[^/]+/[0-9a-f-]{8,}",
+        path_exclude=["operator-rannego", "predstavitel"],
+    )
+    assert len(drafts) == 1
+    assert drafts[0].external_id == "b8edbeb0-f104-4d16-ba68-87072deb62a9"
+    assert "produkt" in drafts[0].title.lower()
+    assert "откликнуться" not in drafts[0].title.lower()
+    assert drafts[0].source == "career_tbank"
+
+
+def test_geekjob_listing_keeps_product():
+    from app.ingestion.jobs.geekjob_connector import (
+        enrich_from_jsonld,
+        parse_geekjob_listing,
+    )
+
+    html = """
+    <li class="collection-item">
+      <p class="truncate vacancy-name">
+        <a href="/vacancy/aaaaaaaaaaaaaaaaaaaaaaaa" class="title">Senior Product Manager</a>
+      </p>
+      <p class="truncate company-name"><a href="/vacancy/aaaaaaaaaaaaaaaaaaaaaaaa">Acme</a></p>
+      <span class="remote-label">remote</span>
+    </li>
+    <li class="collection-item">
+      <p class="truncate vacancy-name">
+        <a href="/vacancy/cccccccccccccccccccccccc" class="title">Sales manager</a>
+      </p>
+      <p class="truncate company-name"><a href="/vacancy/cccccccccccccccccccccccc">Y</a></p>
+    </li>
+    <li class="collection-item">
+      <p class="truncate vacancy-name">
+        <a href="/vacancy/bbbbbbbbbbbbbbbbbbbbbbbb" class="title">Junior Golang Developer</a>
+      </p>
+      <p class="truncate company-name"><a href="/vacancy/bbbbbbbbbbbbbbbbbbbbbbbb">X</a></p>
+    </li>
+    """
+    drafts = parse_geekjob_listing(
+        html, relevance=["product", "продукт", "cpo", "manager"], limit=40
+    )
+    assert len(drafts) == 1
+    assert drafts[0].title == "Senior Product Manager"
+    assert drafts[0].org == "Acme"
+    assert drafts[0].remote is True
+    assert drafts[0].source == "geekjob.ru"
+    assert drafts[0].external_id == "aaaaaaaaaaaaaaaaaaaaaaaa"
+
+    detail = """
+    <script type="application/ld+json">
+    {"@context":"https://schema.org/","@type":"JobPosting","title":"Senior Product Manager",
+     "description":"Lead the roadmap and discovery.",
+     "hiringOrganization":{"@type":"Organization","name":"Acme Corp"},
+     "jobLocation":{"@type":"Place","address":{"@type":"PostalAddress","addressLocality":"Москва"}}}
+    </script>
+    """
+    enrich_from_jsonld(detail, drafts[0])
+    assert drafts[0].org == "Acme Corp"
+    assert drafts[0].location == "Москва"
+    assert "roadmap" in (drafts[0].description or "")
+
+
 def test_career_yaml_lists_bigtech():
     cfg = load_career_config()
     ids = {s["id"] for s in cfg["sites"]}
@@ -147,11 +221,12 @@ def test_career_yaml_lists_bigtech():
     by_id = {s["id"]: s for s in cfg["sites"]}
     enabled = {s["id"] for s in cfg["sites"] if s.get("enabled", True)}
     assert "avito" in enabled and "vk" in enabled and "yandex" in enabled
-    assert {"sber", "alfa", "mts", "wildberries"} <= enabled
+    assert {"sber", "alfa", "mts", "wildberries", "tbank"} <= enabled
     assert by_id["alfa"]["kind"] == "alfa_api"
     assert by_id["wildberries"]["kind"] == "wb_api"
     assert by_id["sber"]["kind"] == "sber_api"
     assert by_id["mts"]["kind"] == "mts_api"
+    assert "list_urls" in by_id["tbank"]
     assert "ozon" not in enabled
 
 
@@ -319,6 +394,7 @@ def test_default_connectors_include_m7bd():
     assert "getmatch.ru" in sources
     assert "career.habr.com" in sources
     assert "career_sites" in sources
+    assert "geekjob.ru" in sources
 
 
 def test_tg_http_proxy_reads_settings(monkeypatch):

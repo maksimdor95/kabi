@@ -15,6 +15,7 @@ from app.db.models import Opportunity, Profile
 from app.ingestion.base import JobConnector
 from app.ingestion.jobs.career_sites_connector import CareerSitesConnector
 from app.ingestion.jobs.getmatch_connector import GetmatchConnector
+from app.ingestion.jobs.geekjob_connector import GeekjobConnector
 from app.ingestion.jobs.habr_connector import HabrCareerConnector
 from app.ingestion.jobs.hh_connector import HHConnector
 from app.ingestion.jobs.superjob_connector import SuperJobConnector
@@ -41,7 +42,7 @@ class IngestionResult:
 
 
 def default_job_connectors() -> list[JobConnector]:
-    """HH/SJ + M7: TG, career sites, Getmatch, Habr Career."""
+    """HH/SJ + M7: TG, career sites, Getmatch, Habr, Geekjob."""
     return [
         HHConnector(),
         SuperJobConnector(),
@@ -49,6 +50,7 @@ def default_job_connectors() -> list[JobConnector]:
         CareerSitesConnector(),
         GetmatchConnector(),
         HabrCareerConnector(),
+        GeekjobConnector(),
     ]
 
 
