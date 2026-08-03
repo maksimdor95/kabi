@@ -120,7 +120,7 @@ async def on_pitch(message: Message) -> None:
             await _answer_not_ready(message, profile)
             return
         await message.answer(
-            "Подбираю СМИ и подкасты для питча… 🎙️",
+            "Подбираю СМИ и подкасты… 🎙️",
             reply_markup=menu_for_profile(profile),
         )
         items = await digest_service.build_digest(session, profile, scope="pitch")
@@ -129,11 +129,12 @@ async def on_pitch(message: Message) -> None:
     if not items:
         await message.answer(
             "Пока нет подходящих СМИ/подкастов под твои темы. "
-            "CFP с датой — /talks, вакансии — /today."
+            "Пока нет подходящих СМИ/подкастов под твои темы. "
+            "Конференции со сроком подачи — /talks, вакансии — /today."
         )
         return
 
-    await message.answer(f"СМИ и подкасты для питча — {len(items)}:")
+    await message.answer(f"СМИ и подкасты — {len(items)}:")
     for item in items:
         await message.answer(
             format_card(item),
@@ -175,7 +176,7 @@ async def on_saved(message: Message) -> None:
 
 @router.message(Command("talks", "deadlines"))
 async def on_talks(message: Message) -> None:
-    """CFP с известной датой. /deadlines — тихий алиас (не в меню команд)."""
+    """Конференции со сроком подачи. /deadlines — тихий алиас (не в меню команд)."""
     from app.services import deadlines as deadlines_service
 
     logger.info(
@@ -188,7 +189,7 @@ async def on_talks(message: Message) -> None:
             await session.commit()
             await message.answer("Сначала загрузи резюме и пройди онбординг.")
             return
-        # Без live-CFP: данные уже в БД (seed + ночной scheduler). Иначе 1+ мин ожидания.
+        # Без live HTTP по страницам заявок: данные уже в БД (seed + ночной scheduler).
         items = await deadlines_service.list_upcoming(session, within_days=60)
         await session.commit()
 

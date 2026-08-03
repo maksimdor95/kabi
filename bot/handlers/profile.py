@@ -29,8 +29,8 @@ BOT_COMMANDS = [
     BotCommand(command="start", description="Старт / статус"),
     BotCommand(command="profile", description="Что менеджер знает о тебе"),
     BotCommand(command="today", description="Вакансии"),
-    BotCommand(command="pitch", description="СМИ и подкасты для питча"),
-    BotCommand(command="talks", description="CFP с датой подачи"),
+    BotCommand(command="pitch", description="СМИ и подкасты"),
+    BotCommand(command="talks", description="Конференции со сроком подачи"),
     BotCommand(command="saved", description="Избранное"),
     BotCommand(command="schedule", description="Расписание рассылок"),
     BotCommand(command="delete", description="Удалить профиль навсегда"),
@@ -80,7 +80,7 @@ async def on_delete_ask(message: Message) -> None:
 
     await message.answer(
         "Удалю профиль, мэтчи, избранное и файл резюме — безвозвратно.\n"
-        "Вакансии/CFP в общей базе останутся.\n\n"
+        "Вакансии и площадки в общей базе останутся.\n\n"
         "Это не «начать заново» (тот только сбрасывает онбординг).\n"
         "Подтверди:",
         reply_markup=delete_confirm_keyboard(),

@@ -166,8 +166,8 @@ _SOURCE_LABELS: dict[str, str] = {
     "career_wildberries": "Wildberries · карьера",
     "career_sites": "Карьерный сайт",
     "tg_jobs": "Telegram",
-    "open_cfp": "OpenCFP",
-    "cfp_discovery": "Поиск CFP",
+    "open_cfp": "Конференции",
+    "cfp_discovery": "Поиск конференций",
     "talk_places_seed": "Каталог площадок",
 }
 

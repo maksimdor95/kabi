@@ -20,6 +20,10 @@ from app.enrichment.base import (
 from app.services import advisor_tools
 from app.services import dialog_memory
 from app.services import profile as profile_service
+from app.services.advisor_profile import (
+    extract_chat_profile_update,
+    format_update_note,
+)
 from app.services.onboarding import (
     STEPS,
     extract_urls,
@@ -31,14 +35,17 @@ from app.services.onboarding import (
 _MANAGER_PERSONA = (
     "Ты — персональный карьерный менеджер пользователя (как менеджер у звезды). "
     "Общаешься тепло, по делу, коротко. "
+    "Не начинай ответы с приветствия («Здравствуйте», «Привет» и т.п.) — сразу по сути; "
+    "пользователь уже в чате. "
     "Не выдумывай факты о пользователе — только профиль и данные из блока инструментов. "
-    "Не выдумывай вакансии, компании, CFP и дедлайны: если в инструментах пусто — "
+    "Не выдумывай вакансии, компании, конференции и дедлайны: если в инструментах пусто — "
     "скажи честно и предложи /today, /talks или /pitch. "
     "Не пиарь масс-медиа и ТВ evergreen (НТВ, утренние шоу и т.п.) — зона: продукт, "
-    "релевантные конференции/CFP и питч только если пользователь просит. "
+    "релевантные конференции и питч только если пользователь просит. "
     "Не составляй утренние планёры и to-do на день, если тебя об этом прямо не просят — "
     "твоя зона: карьера, вакансии, выступления. "
-    "Обращайся нейтрально по роду (без «ты занята» / «ты готова»)."
+    "Обращайся нейтрально по роду (без «ты занята» / «ты готова»). "
+    "Не используй жаргон CFP в ответах пользователю — говори «конференции» / «срок подачи заявки»."
 )
 
 _NO_LINKS_NOTE = (
@@ -352,14 +359,20 @@ def _build_advisor_messages(
     history: list[dict[str, str]],
     tool_context: str,
     user_text: str,
+    profile_update_note: str = "",
 ) -> list[dict[str, str]]:
     """Собрать messages для LLM: persona + профиль + tools + история + реплика."""
     context = profile_service.profile_to_text(profile)
     system_parts = [_MANAGER_PERSONA, f"Краткий профиль:\n{context or '(пусто)'}"]
+    if profile_update_note:
+        system_parts.append(
+            f"Только что сохранено в профиль: {profile_update_note} "
+            "Коротко подтверди это пользователю."
+        )
     if tool_context:
         system_parts.append(
             "Данные из инструментов (единственный источник фактов по вакансиям/"
-            f"CFP/расписанию):\n{tool_context}"
+            f"конференциям/расписанию):\n{tool_context}"
         )
     messages: list[dict[str, str]] = [{"role": "system", "content": "\n\n".join(system_parts)}]
     for msg in history:
@@ -376,14 +389,24 @@ async def _free_chat(
 ) -> AgentReply:
     from app.llm import client as llm
 
+    update = extract_chat_profile_update(text)
+    update_note = ""
+    if update.patch:
+        await profile_service.update_profile(session, profile, update.patch)
+        update_note = format_update_note(update)
+
     history = await dialog_memory.get_history(profile.user_id)
     tools = advisor_tools.select_tools(text)
+    # После записи зарплаты/флагов полезно подтянуть карточку профиля в контекст.
+    if update.patch and "get_profile" not in tools:
+        tools = ["get_profile", *tools]
     tool_context = await advisor_tools.run_tools(session, profile, tools)
     messages = _build_advisor_messages(
         profile=profile,
         history=history,
         tool_context=tool_context,
         user_text=text,
+        profile_update_note=update_note,
     )
     answer = await llm.complete_messages(messages, tier="primary")
     await dialog_memory.append_turn(profile.user_id, text, answer)

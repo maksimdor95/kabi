@@ -38,6 +38,23 @@ def test_persona_forbids_day_planner_and_tv():
     assert "планёр" in low or "to-do" in low or "todo" in low
     assert "тв" in low or "масс-медиа" in low or "нтв" in low
     assert "не выдумывай" in low
+    assert "приветств" in low or "здравствуйте" in low
+    assert "cfp" in low  # запрет жаргона в ответах
+
+
+def test_bot_command_talks_has_no_cfp_jargon():
+    from bot.handlers.profile import BOT_COMMANDS
+
+    talks = next(c for c in BOT_COMMANDS if c.command == "talks")
+    assert "CFP" not in talks.description
+    assert "конферен" in talks.description.lower()
+
+
+def test_menu_deadlines_label_is_human():
+    from bot.keyboards import MENU_DEADLINES
+
+    assert MENU_DEADLINES == "🎤 Конференции"
+    assert "CFP" not in MENU_DEADLINES
 
 
 def test_eval_pool_expect_tools_contract():

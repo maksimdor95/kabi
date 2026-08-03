@@ -73,6 +73,8 @@ async def continue_onboarding(profile) -> AgentReply: ...
 - Ограничение длины истории в контексте (windowed session history) ради OpEx.
 - Tools вызываются **детерминированным роутером** по интенту (не native function
   calling Yandex — ненадёжно). LLM отвечает уже с результатами tools.
+- Ingest из чата — только `refresh_jobs` / `refresh_talks` по явной просьбе
+  («найди…»); иначе snapshot без ingest.
 
 ## 8. Тесты / evals
 
@@ -87,16 +89,22 @@ async def continue_onboarding(profile) -> AgentReply: ...
 | A1 | История: follow-up без повторения контекста | unit `dialog_memory` + mock LLM messages |
 | A2 | «что ты обо мне знаешь» → tool profile, без выдумок | unit router + tool |
 | A3 | «какие вакансии» → snapshot без ingest; пусто → честный ответ | unit router + tool |
+| A3L | «найди вакансии» → live ingest (`refresh_jobs`) | unit router |
 | A4 | «когда присылаешь» → schedule text | unit router |
-| A5 | «составь план на день» без просьбы о карьере → отказ/перенаправление | persona + unit на system/prompt rules |
+| A5 | «составь план на день» → отказ/перенаправление | persona + judge |
 | A6 | Онбординг и `/today` не регрессят | существующие тесты + ручной smoke |
+| A7 | Явное «зарплата от …» / «не предлагай …» пишет в профиль | unit `advisor_profile` + `/profile` smoke |
 
-Размеченный набор реплик: `evals/dialogue/pools/advisor_m9_v1.jsonl`
-(контракт; LLM-judge runner — позже).
+Размеченный набор: `evals/dialogue/pools/advisor_m9_v1.jsonl`.
+
+```bash
+PYTHONPATH=. python scripts/run_advisor_eval.py              # tools-контракт
+PYTHONPATH=. python scripts/run_advisor_eval.py --llm --judge # + ответы + LM-judge
+```
 
 ## 9. Открытые вопросы
 - Насколько часто агент **сам** инициирует диалог вне digests (proactive ping) —
-  отложено; сейчас проактивность = watch/scheduled.
+  **отложено**; сейчас проактивность = watch/scheduled.
 - Native tool calling, когда провайдер стабилен — можно заменить роутер.
 
 ## 10. Статус
@@ -117,9 +125,9 @@ async def continue_onboarding(profile) -> AgentReply: ...
 - Зарплата: PARSE из CV → шаг пропускается; иначе ASK (хард-фильтр вакансий).
 - `hard_nos` — единственный оставшийся «мягкий» ASK, реально фильтрует подборку.
 
-### M9 (советник) — в работе
-- Windowed history в Redis (+ in-memory fallback).
-- Tools: `get_profile`, `get_job_snapshot`, `get_talk_snapshot`, `get_schedule`
-  (digest **без** re-ingest).
-- Роутер интентов + один LLM-ответ с контекстом tools/history.
-- «начать заново» чистит историю диалога.
+### M9 (советник) — ✅ MVP
+- Windowed history в Redis (+ in-memory fallback); clear на рестарт/`/delete`.
+- Tools: snapshot + **live** (`refresh_jobs` / `refresh_talks` по явной просьбе).
+- Запись профиля из чата: зарплата / hard_nos / приоритет / локация / цель (явные фразы).
+- Роутер интентов + один LLM-ответ; evals: `scripts/run_advisor_eval.py`.
+- Proactive ping вне digests — не в этом этапе.

@@ -1,8 +1,23 @@
-# Matching evals (M8)
+# Matching evals (M8) + advisor (M9)
 
-Методология: [`docs/services/evals.md`](../docs/services/evals.md).
+Методология matching: [`docs/services/evals.md`](../docs/services/evals.md).  
+Advisor: [`docs/services/dialogue-agent.md`](../docs/services/dialogue-agent.md) §8.
 
-## Данные
+## Advisor (M9)
+
+| Путь | Содержание |
+|------|------------|
+| `dialogue/pools/advisor_m9_v1.jsonl` | Реплики + expect_tools + must/must_not |
+
+```bash
+# Только контракт роутера (без API)
+PYTHONPATH=. python scripts/run_advisor_eval.py
+
+# Ответы модели + LM-judge
+PYTHONPATH=. python scripts/run_advisor_eval.py --llm --judge
+```
+
+## Matching (M8) — данные
 
 | Путь | Содержание |
 |------|------------|
@@ -15,22 +30,13 @@
 | `matching/rubrics/explain_v1.md` | Rubric E2 |
 | `reports/` | JSON-отчёты (gitignore) |
 
-## Запуск
+## Matching — запуск
 
 ```bash
-# E1 embed (кэш) + E3 — default, если кэш есть
 PYTHONPATH=. python scripts/run_matching_eval.py --mode embed
-
-# Пересобрать кэш (нужен Yandex API)
 PYTHONPATH=. python scripts/build_eval_embedding_cache.py
-
-# Калибровка LM-judge vs human (R1 ≥ 0.7)
 PYTHONPATH=. python scripts/run_matching_eval.py --calibrate-judge
-
-# Полный gate E1+E2+E3
 PYTHONPATH=. python scripts/run_matching_eval.py --mode embed --judge
-
-# CI / локально без API
 PYTHONPATH=. python scripts/run_matching_eval.py --mode lexical
 PYTHONPATH=. python scripts/run_matching_eval.py --mode lexical --pool jobs_m7_v2
 ```
@@ -38,5 +44,5 @@ PYTHONPATH=. python scripts/run_matching_eval.py --mode lexical --pool jobs_m7_v
 ## Тесты
 
 ```bash
-pytest tests/test_matching_evals.py -q
+pytest tests/test_matching_evals.py tests/test_advisor_m9.py tests/test_advisor_profile.py -q
 ```
