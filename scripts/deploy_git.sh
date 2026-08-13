@@ -68,6 +68,9 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+# M10: схема через Alembic (stamp существующих БД / upgrade пустых)
+PYTHONPATH=. python scripts/migrate.py ensure
+
 if systemctl is-enabled kabi-bot >/dev/null 2>&1; then
   sudo systemctl restart kabi-bot
   sleep 2

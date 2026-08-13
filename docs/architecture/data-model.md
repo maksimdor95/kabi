@@ -40,6 +40,8 @@
 | embedding | vector(256) | эмбеддинг профиля (pgvector) |
 | ready_for_matching | bool | вычисляемый флаг готовности (см. profile.md) |
 | onboarding_step | int | указатель текущего шага онбординга (см. dialogue-agent.md) |
+| digest_schedule | jsonb | расписание/режим доставки digests (M6b) |
+| last_digest_at | jsonb | идемпотентность слотов рассылки |
 | updated_at | timestamptz | |
 
 ### Opportunity
@@ -58,8 +60,9 @@
 | deadline | timestamptz | для CFP (M3) |
 | url | text | первоисточник |
 | source | text | идентификатор коннектора |
-| external_id | text | id в источнике (дедуп) |
-| embedding | vector | эмбеддинг возможности |
+| external_id | text | id в источнике (дедуп на уровне ingestion) |
+| meta | jsonb | служебные поля коннектора (cfp_url, how, …) |
+| embedding | vector(256) | эмбеддинг возможности |
 | fetched_at | timestamptz | |
 
 ### Match
@@ -98,7 +101,9 @@ Opportunity не удаляется (общая база).
 
 ## Заметки по индексам
 
-- `Opportunity (source, external_id)` — уникальный, для дедупликации.
+- `Opportunity (source, external_id)` — уникальный индекс **план** (сейчас дедуп в
+  `ingestion`); добавлять миграцией после аудита дублей на стенде.
 - Векторные поля `embedding` — **размерность 256** (Yandex `text-search-*`). Тип `vector(256)`.
-- Векторные индексы (ivfflat/hnsw) на `Profile.embedding` и `Opportunity.embedding`.
-- `Match (profile_id, status)` — для быстрой сборки ежедневной подборки.
+- Векторные индексы (ivfflat/hnsw) на `Profile.embedding` и `Opportunity.embedding` — позже.
+- `Match (profile_id, status)` — индексы есть.
+- Схема версионируется Alembic (`alembic/versions/`, baseline `20260813_0001`).

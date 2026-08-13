@@ -5,11 +5,9 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
-from app.db.models import Base
 
 
 def _database_url() -> str:
@@ -30,17 +28,7 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 
 
 async def init_db() -> None:
-    """Создать расширение pgvector и таблицы. Для MVP; позже — Alembic."""
-    async with engine.begin() as conn:
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        await conn.run_sync(Base.metadata.create_all)
-        # create_all не добавляет колонки в существующие таблицы — доклеиваем вручную.
-        await conn.execute(
-            text("ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS meta JSONB")
-        )
-        await conn.execute(
-            text("ALTER TABLE profiles ADD COLUMN IF NOT EXISTS digest_schedule JSONB")
-        )
-        await conn.execute(
-            text("ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_digest_at JSONB")
-        )
+    """Привести схему к Alembic head (M10). Без create_all / ручных ALTER."""
+    from app.db.migrate import ensure_schema
+
+    await ensure_schema(engine)
