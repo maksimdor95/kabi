@@ -46,6 +46,42 @@ def test_format_card_employer_and_snippet_no_source_accent():
     assert "📡" not in text  # источник не акцентируем
 
 
+def test_format_card_truncates_with_ellipsis():
+    long_desc = (
+        "Проектировать сквозной пользовательский путь: от входа в раздел до перехода. "
+        "Опыт работы Product Manager от 3 лет. "
+        "Опыт развития мобильных или крупных цифровых продуктов. "
+        "Умение самостоятельно формировать продуктовую стратегию и roadmap на год. "
+        "Работать со стейкхолдерами и приоритизировать бэклог по бизнес-ценности."
+    )
+    long_reason = (
+        "Опыт работы в роли Product Owner и руководителя проектов более пяти лет, "
+        "включая запуск продуктов с нуля и работу с метриками, полностью соответствует "
+        "требованиям вакансии Product Manager в крупной компании и ожиданиям команды."
+    )
+    item = DigestItem(
+        match_id="2",
+        score=0.8,
+        reason=long_reason,
+        title="Product manager",
+        org="РСХБ-Интех",
+        location="Москва",
+        remote=False,
+        salary=None,
+        url="https://example.com/job",
+        source="hh.ru",
+        description="..." + long_desc,
+    )
+    text = format_card(item)
+    assert text.count("…") >= 1
+    assert "<b>Суть:</b> ..." not in text  # не начинаем с трёх точек
+    assert "<b>Суть:</b> …" not in text
+    assert "Проектировать" in text
+    why = text.split("<b>Почему ты:</b> ", 1)[1].split("\n\n", 1)[0]
+    assert why.endswith("…")
+    assert len(why) <= 230
+
+
 def test_card_keyboard_draft_callback_and_favorites_label():
     from bot.keyboards import card_keyboard
 

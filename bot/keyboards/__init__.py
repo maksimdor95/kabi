@@ -128,24 +128,46 @@ _TOPICS_TAIL_RE = re.compile(
     r"(?:\n|\s)*Темы\s*:\s*[^\n]*$",
     re.I,
 )
+# HH/snippet часто начинается с «...» или с середины предложения.
+_LEADING_JUNK_RE = re.compile(r"^(?:\.{2,}|…|\s)+")
+
+_SNIPPET_LIMIT = 220
+_REASON_LIMIT = 220
 
 
-def _snippet(text: str | None, *, limit: int = 320) -> str | None:
+def _ellipsis_cut(text: str, *, limit: int) -> str:
+    """Обрезать по границе слова и поставить …"""
+    text = _WS_RE.sub(" ", text).strip()
+    if len(text) <= limit:
+        return text
+    cut = text[: limit - 1].rsplit(" ", 1)[0]
+    return (cut or text[: limit - 1]).rstrip(".,;:…") + "…"
+
+
+def _snippet(text: str | None, *, limit: int = _SNIPPET_LIMIT) -> str | None:
     """Короткая выжимка описания (для карточки без перехода на HH)."""
     if not text:
         return None
     clean = _TOPICS_TAIL_RE.sub("", text)
     clean = _TAG_RE.sub(" ", clean)
     clean = _WS_RE.sub(" ", clean).strip()
+    clean = _LEADING_JUNK_RE.sub("", clean).strip()
+    # если после junk осталось с маленькой буквы — ок, это кусок обязанности
     if len(clean) < 40:
         return None
     # отрезать служебные префиксы seed talks
     if clean.lower().startswith("площадка:"):
         return None
-    if len(clean) <= limit:
-        return clean
-    cut = clean[: limit - 1].rsplit(" ", 1)[0]
-    return (cut or clean[: limit - 1]).rstrip(".,;:") + "…"
+    return _ellipsis_cut(clean, limit=limit)
+
+
+def _reason_snip(text: str | None, *, limit: int = _REASON_LIMIT) -> str | None:
+    if not text:
+        return None
+    clean = _WS_RE.sub(" ", _TAG_RE.sub(" ", text)).strip()
+    if len(clean) < 20:
+        return None
+    return _ellipsis_cut(clean, limit=limit)
 
 
 _SOURCE_LABELS: dict[str, str] = {
@@ -247,9 +269,10 @@ def format_card(item: DigestItem, *, show_source: bool = False) -> str:
         lines.append("")
         lines.append(f"<b>Суть:</b> {snippet}")
 
-    if item.reason:
+    reason = _reason_snip(item.reason)
+    if reason:
         lines.append("")
-        lines.append(f"<b>Почему ты:</b> {item.reason}")
+        lines.append(f"<b>Почему ты:</b> {reason}")
 
     if show_source:
         src = format_source_label(item.source)
