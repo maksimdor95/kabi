@@ -124,8 +124,18 @@ async def _apply_embedding_learning(
     return True
 
 
-async def record_reaction(session: AsyncSession, match_id: str, reaction: str) -> ReactionResult:
-    """Сохранить реакцию. save на уже saved → снять с избранного. 👍/👎 → blend emb."""
+async def record_reaction(
+    session: AsyncSession,
+    match_id: str,
+    reaction: str,
+    *,
+    actor_profile_id: uuid.UUID | None = None,
+) -> ReactionResult:
+    """Сохранить реакцию. save на уже saved → снять с избранного. 👍/👎 → blend emb.
+
+    Если передан actor_profile_id — только владелец матча может менять реакцию
+    (MU-A / docs/services/multiuser.md).
+    """
     if reaction not in {"up", "down", "hide", "save", "unsave"}:
         return ReactionResult(ok=False)
     try:
@@ -136,6 +146,15 @@ async def record_reaction(session: AsyncSession, match_id: str, reaction: str) -
     match = await session.get(Match, mid)
     if match is None:
         return ReactionResult(ok=False)
+
+    if actor_profile_id is not None and match.profile_id != actor_profile_id:
+        logger.warning(
+            "isolation_deny feedback match=%s actor_profile=%s owner=%s",
+            match_id,
+            actor_profile_id,
+            match.profile_id,
+        )
+        return ReactionResult(ok=False, effect="forbidden")
 
     if reaction == "save":
         if match.status == "saved":

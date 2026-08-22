@@ -10,11 +10,19 @@ M2 (запись реакций) + M4 (обучение через эмбедд�
 ## 3. Публичный интерфейс
 ```python
 def blend_embedding(base, delta, *, sign: int, alpha: float) -> list[float]: ...
-async def record_reaction(session, match_id: str, reaction: str) -> ReactionResult: ...
+async def record_reaction(
+    session,
+    match_id: str,
+    reaction: str,
+    *,
+    actor_profile_id: UUID | None = None,
+) -> ReactionResult: ...
 async def list_saved(session, profile) -> list[DigestItem]: ...
 ```
 Реакции: `up` | `down` | `hide` | `save` | `unsave`.
 `save` на уже `saved` — toggle (снять с избранного).
+`actor_profile_id` (MU-A): если задан и ≠ `match.profile_id` → `ok=False`,
+`effect=forbidden`, Feedback не пишется. См. `multiuser.md`.
 
 Обучение (M4): на `up`/`down` сдвигаем `Profile.embedding`:
 - up: `normalize(emb + 0.15 * opp_emb)`
@@ -37,6 +45,7 @@ async def list_saved(session, profile) -> list[DigestItem]: ...
 - Малый alpha (0.15 / 0.20) — сглаживание, без резких скачков на одной реакции.
 - Прозрачность: ack «учёл для следующих подборок» при `learned=True`.
 - Повторный `compute_embedding` (новое CV) сбрасывает сдвиги — ок для MVP.
+- Изоляция: чужой `match_id` не меняет чужой embedding (MU-A).
 
 ## 8. Тесты / evals
 - **Тест:** save → unsave (toggle) корректно меняет статус матча.
