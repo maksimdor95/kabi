@@ -10,7 +10,8 @@ from app.db.session import get_session
 from app.services import dialogue_agent
 from app.services import profile as profile_service
 from app.services.onboarding import STEPS
-from bot.keyboards import main_menu_keyboard, menu_for_profile, remove_keyboard, reply_keyboard
+from bot.handlers import miniapp
+from bot.keyboards import menu_for_profile, remove_keyboard, reply_keyboard
 
 router = Router(name="start")
 
@@ -46,6 +47,12 @@ async def on_start(message: Message) -> None:
             "Онбординг заново — «начать заново».",
             reply_markup=menu_for_profile(profile),
         )
+        app_url = miniapp.miniapp_url()
+        if app_url:
+            await message.answer(
+                "Всё то же самое — но экраном: подборки, избранное и профиль.",
+                reply_markup=miniapp.open_app_keyboard(app_url),
+            )
         return
 
     if 0 <= profile.onboarding_step < len(STEPS):

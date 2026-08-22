@@ -73,12 +73,42 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
+echo "==> systemd unit (kabi-api) — FastAPI для Mini App (M11)"
+API_SERVICE_FILE=/etc/systemd/system/kabi-api.service
+sudo tee "$API_SERVICE_FILE" >/dev/null <<EOF
+[Unit]
+Description=Kabi API (Telegram Mini App)
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$ROOT
+Environment=PYTHONPATH=$ROOT
+# Слушаем только localhost: наружу пускает Caddy с TLS (deploy/Caddyfile).
+ExecStart=$ROOT/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8080
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 sudo systemctl daemon-reload
-sudo systemctl enable kabi-bot
-sudo systemctl restart kabi-bot
+sudo systemctl enable kabi-bot kabi-api
+sudo systemctl restart kabi-bot kabi-api
 
 echo
 echo "Готово. Статус:"
 sudo systemctl status kabi-bot --no-pager -l || true
+sudo systemctl status kabi-api --no-pager -l || true
 echo
-echo "Логи: journalctl -u kabi-bot -f"
+echo "Логи: journalctl -u kabi-bot -f   ·   journalctl -u kabi-api -f"
+echo
+echo "Mini App (M11) — что осталось сделать руками:"
+echo "  1) домен A-записью на эту ВМ, порты 80/443 открыты"
+echo "  2) sudo apt-get install -y caddy && sudo cp deploy/Caddyfile /etc/caddy/Caddyfile"
+echo "     (заменить kabi.example.com на свой домен), sudo systemctl reload caddy"
+echo "  3) в .env: MINIAPP_ENABLED=true и MINIAPP_URL=https://твой.домен"
+echo "  4) sudo systemctl restart kabi-bot kabi-api"

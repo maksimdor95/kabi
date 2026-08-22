@@ -9,16 +9,23 @@ M2 (ежедневная подборка), M3 (напоминания о дед
 
 ## 3. Публичный интерфейс
 ```python
-async def build_daily_digest(user_id: UUID, limit: int = 3) -> list[Match]: ...
-async def send_digest(user_id: UUID) -> None: ...
+async def build_digest(session, profile, *, scope, do_ingest=True, limit=7, …) -> list[DigestItem]: ...
 ```
+`scope`: `jobs` | `pitch` | `talks`. `do_ingest=False` — только то, что уже в БД
+(так работает открытие Mini App: без похода в источники).
+
+Поля карточки (`app/services/cards.py`) — presentation-neutral и общие для всех
+каналов: `format_salary`, `card_title`, `card_summary`, `reason_snippet`,
+`format_source_label`. Разметку добавляет канал: HTML в `bot/keyboards`,
+JSON в `app/api`.
 
 ## 4. Входы / Выходы
-- **Вход:** свежие `Match` со статусом `new`.
-- **Выход:** сообщения-карточки в Telegram (через `bot`).
+- **Вход:** профиль + свежие `Match`.
+- **Выход:** `DigestItem` → карточки в Telegram или в Mini App.
 
 ## 5. Зависимости
-- **Внутренние:** `app/db` (выборка матчей), `bot` (отправка), `app/scheduler` (триггер).
+- **Внутренние:** `app/db`, `app/services/matching`, `app/ingestion`,
+  `app/services/schedule`; потребители — `bot`, `app/api`, `app/scheduler`.
 - **Внешние:** —
 
 ## 6. Данные
@@ -35,4 +42,6 @@ async def send_digest(user_id: UUID) -> None: ...
 - Время доставки; частота (ежедневно/по мере появления сильных матчей).
 
 ## 10. Статус
-не начат
+M2/M3 в проде: `/today`, `/pitch`, `/talks` + рассылка по расписанию.
+M11: те же данные отдаёт `GET /api/v1/feed`; общие поля карточки вынесены
+в `app/services/cards.py`.

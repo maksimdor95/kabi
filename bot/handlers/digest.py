@@ -6,14 +6,12 @@
 
 from __future__ import annotations
 
-import uuid
+from typing import TYPE_CHECKING
 
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
-from sqlalchemy import select
 
-from app.db.models import Match, Opportunity, Profile
 from app.db.session import get_session
 from app.observability.logging import get_logger
 from app.services import digest as digest_service
@@ -28,6 +26,9 @@ from bot.keyboards import (
     remove_keyboard,
     reply_keyboard,
 )
+
+if TYPE_CHECKING:
+    from app.db.models import Profile
 
 router = Router(name="digest")
 logger = get_logger("kabi.bot.digest")
@@ -212,12 +213,30 @@ async def on_feedback(callback: CallbackQuery) -> None:
         await callback.answer("Не понял реакцию")
         return
 
+    if callback.from_user is None:
+        await callback.answer("Нет пользователя")
+        return
+
     async with get_session() as session:
-        result = await feedback_service.record_reaction(session, match_id, reaction)
+        user = await profile_service.get_or_create_user(session, callback.from_user.id)
+        profile = await profile_service.get_profile(session, user.id)
+        if profile is None:
+            await session.commit()
+            await callback.answer("Сначала профиль")
+            return
+        result = await feedback_service.record_reaction(
+            session,
+            match_id,
+            reaction,
+            actor_profile_id=profile.id,
+        )
         await session.commit()
 
     if not result.ok:
-        await callback.answer("Уже неактуально")
+        if result.effect == "forbidden":
+            await callback.answer("Это не твоя карточка")
+        else:
+            await callback.answer("Уже неактуально")
         return
 
     ack = _REACTION_ACK.get(result.effect) or _REACTION_ACK.get(reaction, "Готово")
@@ -255,33 +274,21 @@ async def on_draft(callback: CallbackQuery) -> None:
     if not match_id:
         await callback.answer("Не понял карточку")
         return
+    if callback.from_user is None:
+        await callback.answer("Нет пользователя")
+        return
 
     await callback.answer("Готовлю сопроводительное…")
     async with get_session() as session:
-        try:
-            mid = uuid.UUID(match_id)
-        except ValueError:
-            await callback.message.answer("Карточка устарела.")
-            return
-
-        row = (
-            await session.execute(
-                select(Match, Opportunity)
-                .join(Opportunity, Opportunity.id == Match.opportunity_id)
-                .where(Match.id == mid)
-            )
-        ).first()
-        if row is None:
-            await callback.message.answer("Карточка устарела.")
-            return
-        match, opp = row
-        # match.profile_id — это Profile.id, а не user_id: берём напрямую.
-        profile = await session.get(Profile, match.profile_id)
+        user = await profile_service.get_or_create_user(session, callback.from_user.id)
+        profile = await profile_service.get_profile(session, user.id)
         if profile is None:
+            await session.commit()
             await callback.message.answer("Сначала собери профиль.")
             return
+
         try:
-            text = await drafts_service.draft_for_opportunity(profile, opp)
+            result = await drafts_service.draft_for_match(session, profile, match_id)
         except Exception as exc:  # noqa: BLE001
             logger.exception("draft_failed match=%s", match_id)
             await callback.message.answer(f"Не смог набросать черновик: {exc}")
@@ -289,12 +296,19 @@ async def on_draft(callback: CallbackQuery) -> None:
             return
         await session.commit()
 
-    if (opp.type or "") == "talk":
-        header = "<b>Черновик заявки / питча</b> — проверь и отправь сам:"
+    if not result.ok:
+        if result.error == "forbidden":
+            await callback.message.answer("Это не твоя карточка.")
+        else:
+            await callback.message.answer("Карточка устарела.")
+        return
+
+    if result.kind == "talk_pitch":
+        header = "<b>Черновик заявки</b> — проверь и отправь сам:"
     else:
         header = "<b>Сопроводительное письмо</b> — проверь и отправь сам:"
     await callback.message.answer(
-        f"{header}\n\n{text}",
+        f"{header}\n\n{result.text}",
         parse_mode="HTML",
         disable_web_page_preview=True,
     )

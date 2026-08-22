@@ -1,0 +1,26 @@
+# HTTPS-фронт для Telegram Mini App (M11). Спека: docs/services/miniapp.md §8
+#
+# Caddy сам получает и продлевает сертификат Let's Encrypt — Telegram принимает
+# только валидный HTTPS. Домен должен A-записью смотреть на ВМ, порты 80/443 открыты.
+#
+# Установка на ВМ:
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   sudo sed -i 's/kabi.example.com/ТВОЙ.ДОМЕН/' /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+
+kabi.example.com {
+	encode zstd gzip
+
+	# API + статика Mini App — один origin, поэтому CORS не нужен.
+	reverse_proxy 127.0.0.1:8080
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/kabi.log
+		format console
+	}
+}

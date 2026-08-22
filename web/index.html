@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Kabi</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  </head>
+  <body>
+    <div id="app" class="app" hidden>
+      <header class="topbar">
+        <div class="topbar__title" id="screen-title">Вакансии</div>
+        <button class="ghost-btn" id="refresh-btn" type="button">
+          <span class="ghost-btn__icon" id="refresh-icon"></span>
+          <span>Обновить</span>
+        </button>
+      </header>
+
+      <main class="screen" id="screen"></main>
+
+      <nav class="tabbar" id="tabbar"></nav>
+    </div>
+
+    <div class="gate" id="gate">
+      <div class="gate__card">
+        <div class="gate__logo">Kabi</div>
+        <p class="gate__text" id="gate-text">Загружаю…</p>
+      </div>
+    </div>
+
+    <div class="sheet" id="sheet" hidden>
+      <div class="sheet__backdrop" data-close="1"></div>
+      <section class="sheet__panel" role="dialog" aria-modal="true">
+        <header class="sheet__head">
+          <h2 class="sheet__title" id="sheet-title">Черновик</h2>
+          <button class="sheet__close" id="sheet-close" type="button" aria-label="Закрыть">✕</button>
+        </header>
+        <div class="sheet__body" id="sheet-body"></div>
+        <footer class="sheet__foot">
+          <button class="btn btn--primary" id="sheet-copy" type="button">Скопировать</button>
+        </footer>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

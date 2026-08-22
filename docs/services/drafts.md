@@ -9,11 +9,17 @@ M4.
 
 ## 3. Публичный интерфейс
 ```python
+async def draft_for_match(session, profile, match_id) -> DraftResult: ...
 async def draft_for_opportunity(profile, opportunity) -> str: ...
 async def draft_application(profile, opportunity) -> str: ...
 async def draft_cfp_pitch(profile, opportunity) -> str: ...
 ```
 Роутинг: `opportunity.type == "talk"` → CFP-питч, иначе отклик на вакансию.
+
+`draft_for_match` — вход для каналов (бот и Mini App): находит матч, **проверяет
+владельца** (MU-A) и возвращает `DraftResult(ok, error, kind, text)`, где
+`error ∈ {not_found, forbidden}`. Проверка живёт здесь, а не в хендлерах, чтобы
+обе поверхности отвечали одинаково.
 
 ## 4. Входы / Выходы
 - **Вход:** профиль + выбранная возможность (из callback `draft:{match_id}`).
@@ -41,3 +47,5 @@ async def draft_cfp_pitch(profile, opportunity) -> str: ...
 ## 10. Статус
 M4: реализованы `draft_application` / `draft_cfp_pitch` + кнопка «✍️ Сопроводительное»
 на карточке (`callback_data=draft:{match_id}`, не `fb:draft:`).
+M11: `draft_for_match` — общий вход с проверкой владельца; Mini App вызывает
+`POST /api/v1/matches/{id}/draft` (rate limit 5 / 5 мин).

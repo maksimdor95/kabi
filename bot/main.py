@@ -14,7 +14,7 @@ from app.config import settings
 from app.db.session import init_db
 from app.observability.logging import get_logger
 from app.scheduler import start_scheduler
-from bot.handlers import chat, cv, digest, profile, start
+from bot.handlers import chat, cv, digest, miniapp, profile, start
 
 logger = get_logger("kabi.bot")
 
@@ -25,6 +25,7 @@ def build_dispatcher() -> Dispatcher:
     dp.include_router(cv.router)
     dp.include_router(profile.router)  # /profile + меню
     dp.include_router(digest.router)  # /today /saved + колбэки
+    dp.include_router(miniapp.router)  # /app
     dp.include_router(chat.router)  # текст — последним
     return dp
 
@@ -36,10 +37,14 @@ async def main() -> None:
     bot = Bot(token=settings.telegram_bot_token)
     from bot.handlers.profile import BOT_COMMANDS
 
+    commands = list(BOT_COMMANDS)
+    if miniapp.miniapp_url():
+        commands.insert(1, miniapp.APP_COMMAND)
     try:
-        await bot.set_my_commands(BOT_COMMANDS)
+        await bot.set_my_commands(commands)
     except Exception as exc:  # noqa: BLE001 — не блокируем старт при сетевых сбоях
         logger.warning("set_my_commands failed: %s", exc)
+    await miniapp.setup_menu_button(bot)
     dp = build_dispatcher()
     start_scheduler(bot)
     logger.info("bot_starting")

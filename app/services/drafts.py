@@ -5,7 +5,14 @@
 
 from __future__ import annotations
 
-from app.db.models import Opportunity, Profile
+import uuid
+from dataclasses import dataclass
+from typing import Literal
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models import Match, Opportunity, Profile
 from app.llm import client as llm
 from app.observability.logging import get_logger
 from app.services.profile import profile_to_text
@@ -73,3 +80,58 @@ async def draft_for_opportunity(profile: Profile, opportunity: Opportunity) -> s
         return await draft_cfp_pitch(profile, opportunity)
     logger.info("draft_application opp=%s", opportunity.id)
     return await draft_application(profile, opportunity)
+
+
+DraftKind = Literal["cover_letter", "talk_pitch"]
+
+
+@dataclass(frozen=True)
+class DraftResult:
+    ok: bool
+    error: str = ""  # not_found | forbidden
+    kind: DraftKind = "cover_letter"
+    text: str = ""
+
+
+async def draft_for_match(
+    session: AsyncSession,
+    profile: Profile,
+    match_id: str,
+) -> DraftResult:
+    """Найти свой матч и сгенерировать черновик.
+
+    Владельца проверяем здесь, а не в каналах: бот и Mini App дают один ответ
+    (MU-A, docs/services/multiuser.md).
+    """
+    try:
+        mid = uuid.UUID(match_id)
+    except ValueError:
+        return DraftResult(ok=False, error="not_found")
+
+    row = (
+        await session.execute(
+            select(Match, Opportunity)
+            .join(Opportunity, Opportunity.id == Match.opportunity_id)
+            .where(Match.id == mid)
+        )
+    ).first()
+    if row is None:
+        return DraftResult(ok=False, error="not_found")
+
+    match, opp = row
+    if match.profile_id != profile.id:
+        logger.warning(
+            "isolation_deny draft match=%s actor_profile=%s owner=%s",
+            match_id,
+            profile.id,
+            match.profile_id,
+        )
+        return DraftResult(ok=False, error="forbidden")
+
+    is_talk = (opp.type or "job") == "talk"
+    text = await draft_for_opportunity(profile, opp)
+    return DraftResult(
+        ok=True,
+        kind="talk_pitch" if is_talk else "cover_letter",
+        text=text,
+    )

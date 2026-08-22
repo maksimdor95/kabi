@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     linkedin_li_at: str = ""
     linkedin_jsessionid: str = ""
 
+    # --- Telegram Mini App (M11) ---
+    miniapp_enabled: bool = False
+    miniapp_url: str = ""  # публичный https://… для кнопки в боте
+    miniapp_auth_ttl_seconds: int = 86400  # срок годности initData
+
     app_env: str = "local"
     log_level: str = "INFO"
 

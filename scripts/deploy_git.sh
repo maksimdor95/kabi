@@ -71,12 +71,14 @@ fi
 # M10: схема через Alembic (stamp существующих БД / upgrade пустых)
 PYTHONPATH=. python scripts/migrate.py ensure
 
-if systemctl is-enabled kabi-bot >/dev/null 2>&1; then
-  sudo systemctl restart kabi-bot
-  sleep 2
-  sudo systemctl is-active kabi-bot
-  echo "Логи: journalctl -u kabi-bot -n 20 --no-pager"
-fi
+for unit in kabi-bot kabi-api; do
+  if systemctl is-enabled "\$unit" >/dev/null 2>&1; then
+    sudo systemctl restart "\$unit"
+    sleep 2
+    sudo systemctl is-active "\$unit"
+    echo "Логи: journalctl -u \$unit -n 20 --no-pager"
+  fi
+done
 EOF
 
 echo "OK → $TARGET:$REMOTE_DIR ($BRANCH from GitHub)"
