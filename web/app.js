@@ -11,8 +11,8 @@
 
   const TABS = [
     { id: "jobs", icon: "search", label: "Вакансии", title: "Вакансии", kind: "feed" },
-    { id: "pitch", icon: "mic", label: "СМИ", title: "СМИ и подкасты", kind: "feed" },
-    { id: "talks", icon: "stage", label: "Конфы", title: "Конференции", kind: "feed" },
+    { id: "pitch", icon: "mic", label: "СМИ", title: "СМИ", kind: "feed" },
+    { id: "talks", icon: "stage", label: "Конфы", title: "Конфы", kind: "feed" },
     { id: "saved", icon: "bookmark", label: "Избранное", title: "Избранное", kind: "saved" },
     { id: "profile", icon: "user", label: "Профиль", title: "Профиль", kind: "profile" },
   ];
@@ -695,6 +695,12 @@
 
     tg.ready();
     tg.expand();
+    syncSafeArea();
+    if (tg.onEvent) {
+      tg.onEvent("safeAreaChanged", syncSafeArea);
+      tg.onEvent("contentSafeAreaChanged", syncSafeArea);
+      tg.onEvent("viewportChanged", syncSafeArea);
+    }
     if (tg.setHeaderColor) {
       try {
         tg.setHeaderColor("secondary_bg_color");
@@ -721,6 +727,17 @@
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") closeSheet();
     });
+  }
+
+  /** Подтянуть inset'ы Telegram в CSS-переменные: иначе env(safe-area-*) в WebView врёт. */
+  function syncSafeArea() {
+    const root = document.documentElement;
+    const safe = (tg && tg.safeAreaInset) || {};
+    const content = (tg && tg.contentSafeAreaInset) || {};
+    const bottom = Number(safe.bottom) || 0;
+    const contentTop = Number(content.top) || 0;
+    root.style.setProperty("--safe-bottom", `${bottom}px`);
+    root.style.setProperty("--content-safe-top", `${contentTop}px`);
   }
 
   boot();

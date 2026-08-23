@@ -12,7 +12,12 @@
   --border: color-mix(in srgb, var(--hint) 22%, transparent);
   --radius: 16px;
   --gap: 12px;
-  --tabbar-h: 58px;
+  /* Высота ряда иконок+подписей (без safe-area). Safe-area подмешиваем отдельно. */
+  --tabbar-h: 56px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Отступ под нативную шапку Telegram (✕ Закрыть); JS может перезаписать. */
+  --content-safe-top: 0px;
 }
 
 * {
@@ -49,7 +54,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 16px;
+  padding: calc(10px + var(--content-safe-top)) 16px 10px;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: saturate(160%) blur(14px);
   border-bottom: 1px solid var(--border);
@@ -117,7 +122,8 @@ body {
   width: 100%;
   max-width: 680px; /* на десктопе Telegram окно шире телефона — не растягиваем строки */
   margin: 0 auto;
-  padding: var(--gap) var(--gap) calc(var(--tabbar-h) + 24px);
+  /* tabbar-h + safe-bottom + запас, иначе последняя карточка уезжает под бар */
+  padding: var(--gap) var(--gap) calc(var(--tabbar-h) + var(--safe-bottom) + 28px);
   display: flex;
   flex-direction: column;
   gap: var(--gap);
@@ -485,20 +491,23 @@ body {
 
 .tabbar {
   position: fixed;
-  left: 0;
-  right: 0;
+  /* left/right:0 + max-width в Telegram Desktop WebView часто тянет бар на всю ширину —
+     центрируем явно через left:50% + translateX. */
+  left: 50%;
   bottom: 0;
   z-index: 6;
-  margin: 0 auto;
-  max-width: 680px;
+  width: min(100%, 680px);
+  transform: translateX(-50%);
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   gap: 2px;
-  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  height: calc(var(--tabbar-h) + var(--safe-bottom));
+  padding: 4px 4px var(--safe-bottom);
   background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: saturate(160%) blur(14px);
   border-top: 1px solid var(--border);
+  box-sizing: border-box;
 }
 
 .tab {
@@ -508,26 +517,39 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
-  padding: 4px 2px;
+  min-height: var(--tabbar-h);
+  padding: 6px 2px;
   font-size: 10.5px;
   font-weight: 600;
   cursor: pointer;
   border-radius: 10px;
   transition: color 0.15s ease;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .tab svg {
-  width: 21px;
-  height: 21px;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
 }
 
 .tab__label {
   line-height: 1.1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tab.is-active {
   color: var(--accent);
+}
+
+.tab:active {
+  opacity: 0.7;
 }
 
 .tab__dot {
@@ -665,10 +687,10 @@ body {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--tabbar-h) + 20px);
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 20px);
   transform: translateX(-50%);
   z-index: 40;
-  max-width: 90vw;
+  max-width: min(90vw, 680px);
   padding: 10px 16px;
   border-radius: 12px;
   background: rgba(20, 22, 26, 0.92);
