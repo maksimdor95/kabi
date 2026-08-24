@@ -10,9 +10,15 @@ M2 (ежедневная подборка), M3 (напоминания о дед
 ## 3. Публичный интерфейс
 ```python
 async def build_digest(session, profile, *, scope, do_ingest=True, limit=7, …) -> list[DigestItem]: ...
+async def list_pending(session, profile, *, scope, limit=7) -> list[DigestItem]: ...
 ```
-`scope`: `jobs` | `pitch` | `talks`. `do_ingest=False` — только то, что уже в БД
-(так работает открытие Mini App: без похода в источники).
+`scope`: `jobs` | `pitch` | `talks`.
+
+- `build_digest` — создать **новые** Match (опционально с ingest). Возвращает
+  только что созданные; если кандидаты уже сматчены раньше → `[]`.
+- `list_pending` — витрина: уже существующие `Match.status=new` по scope
+  (то, на что ещё не было реакции). Так работает Mini App: открытие не
+  выглядит пустым, пока в карманах бота лежат неотреагированные карточки.
 
 Поля карточки (`app/services/cards.py`) — presentation-neutral и общие для всех
 каналов: `format_salary`, `card_title`, `card_summary`, `reason_snippet`,
@@ -43,5 +49,6 @@ JSON в `app/api`.
 
 ## 10. Статус
 M2/M3 в проде: `/today`, `/pitch`, `/talks` + рассылка по расписанию.
-M11: те же данные отдаёт `GET /api/v1/feed`; общие поля карточки вынесены
+M11: `GET /api/v1/feed` → `list_pending` (мгновенно); `POST /feed/refresh` →
+`build_digest` (ingest+новые Match) + снова `list_pending`. Общие поля карточки
 в `app/services/cards.py`.

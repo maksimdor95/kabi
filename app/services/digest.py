@@ -76,6 +76,45 @@ def _fmt_item(match: Match, opp: Opportunity) -> DigestItem:
     )
 
 
+async def list_pending(
+    session: AsyncSession,
+    profile: Profile,
+    *,
+    scope: MatchScope = "jobs",
+    limit: int = 7,
+) -> list[DigestItem]:
+    """Неотреагированные карточки (Match.status=new) для витрины Mini App.
+
+    `build_digest` создаёт только *новые* Match и поэтому возвращает [] если
+    бот/расписание уже сматчили всех кандидатов. Здесь читаем то, что ещё
+    ждёт реакции — иначе приложение выглядит пустым при полных карманах.
+    """
+    stmt = (
+        select(Match, Opportunity)
+        .join(Opportunity, Opportunity.id == Match.opportunity_id)
+        .where(Match.profile_id == profile.id, Match.status == "new")
+        .order_by(Match.score.desc().nulls_last(), Match.created_at.desc())
+    )
+    if scope == "jobs":
+        stmt = stmt.where(Opportunity.type == "job").limit(limit)
+    else:
+        # pitch фильтруем evergreen в Python — в SQL нет is_evergreen_pitch.
+        stmt = stmt.where(Opportunity.type == "talk").limit(max(limit * 4, 20))
+
+    rows = (await session.execute(stmt)).all()
+    items: list[DigestItem] = []
+    for match, opp in rows:
+        if scope == "pitch" and not matching.is_evergreen_pitch(opp):
+            continue
+        if scope == "talks" and matching.is_evergreen_pitch(opp):
+            # talks = CFP/сроки; evergreen уезжает в /pitch
+            continue
+        items.append(_fmt_item(match, opp))
+        if len(items) >= limit:
+            break
+    return items
+
+
 async def build_digest(
     session: AsyncSession,
     profile: Profile,

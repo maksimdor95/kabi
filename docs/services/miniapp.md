@@ -53,8 +53,8 @@
 | `GET` | `/health` | liveness (без auth) |
 | `GET` | `/api/v1/config` | публичный конфиг UI (без auth) |
 | `GET` | `/api/v1/me` | профиль: роли, навыки, готовность, шаг онбординга |
-| `GET` | `/api/v1/feed?scope=jobs\|pitch\|talks&limit=` | подборка **из БД**, без ingest |
-| `POST` | `/api/v1/feed/refresh` | подборка **с ingest** (долго, отдельная кнопка) |
+| `GET` | `/api/v1/feed?scope=jobs\|pitch\|talks&limit=` | витрина: `Match.status=new` из БД |
+| `POST` | `/api/v1/feed/refresh` | ingest + попытка новых Match, затем та же витрина |
 | `GET` | `/api/v1/saved` | избранное |
 | `POST` | `/api/v1/matches/{id}/reaction` | `{"reaction": "up\|down\|save\|unsave\|hide"}` |
 | `POST` | `/api/v1/matches/{id}/draft` | черновик отклика/заявки (LLM) |
@@ -62,9 +62,9 @@
 Коды: `200`, `401` (auth), `403` (чужой match), `404` (нет профиля/матча),
 `409` (профиль не готов к подбору), `422` (валидация), `429` (rate limit).
 
-`GET /feed` намеренно не ходит в сеть: открытие Mini App должно быть мгновенным.
-Свежие данные — `POST /feed/refresh` (та же логика, что `/today` в боте) или
-ночной scheduler.
+`GET /feed` читает неотреагированные `Match` (`list_pending`) — мгновенно, даже
+если бот уже создал их раньше. `POST /feed/refresh` дополнительно ходит в
+источники и пробует сматчить ещё (`build_digest`), затем снова отдаёт витрину.
 
 ## 4b. Правила UI
 
@@ -116,7 +116,7 @@ In-process token bucket на `telegram_id` для дорогих ручек:
 | A5 | Чужой токен бота → `401 bad_signature` |
 | A6 | `initData` с `signature` (Bot API 7.2+) проходит проверку |
 | A7 | Нет заголовка `Authorization` → `401` |
-| M1 | `/feed` не вызывает ingest (`do_ingest=False`) |
+| M1 | `/feed` отдаёт `list_pending`, без ingest |
 | M2 | Реакция на чужой match → `403`, статус чужого матча не изменился |
 | M3 | `/saved` возвращает только свои матчи |
 | M4 | `/me` без профиля → `404` с шагом онбординга |

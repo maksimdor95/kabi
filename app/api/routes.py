@@ -130,11 +130,21 @@ async def _build_feed(
     if not profile.ready_for_matching:
         raise _not_ready()
 
-    items = await digest_service.build_digest(
+    if do_ingest:
+        # Добираем свежие Match, если ещё есть несматченные кандидаты.
+        # Даже при items=0 ниже покажем уже существующие status=new.
+        await digest_service.build_digest(
+            session,
+            profile,
+            scope=scope,
+            do_ingest=True,
+            limit=limit,
+        )
+
+    items = await digest_service.list_pending(
         session,
         profile,
         scope=scope,
-        do_ingest=do_ingest,
         limit=limit,
     )
     logger.info(

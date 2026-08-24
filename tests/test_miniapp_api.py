@@ -185,20 +185,26 @@ def test_me_returns_profile_summary(api):
 # --------------------------- подборка ---------------------------
 
 
-def test_m1_feed_does_not_ingest(api, monkeypatch):
+def test_m1_feed_lists_pending_without_ingest(api, monkeypatch):
     client, _ = api
-    seen: dict[str, object] = {}
+    seen_pending: dict[str, object] = {}
+    build_calls = {"n": 0}
 
-    async def fake_build(_session, _profile, **kwargs):
-        seen.update(kwargs)
+    async def fake_build(*_a, **_k):
+        build_calls["n"] += 1
+        raise AssertionError("GET /feed не должен звать build_digest")
+
+    async def fake_pending(_session, _profile, **kwargs):
+        seen_pending.update(kwargs)
         return [_item()]
 
     monkeypatch.setattr("app.api.routes.digest_service.build_digest", fake_build)
+    monkeypatch.setattr("app.api.routes.digest_service.list_pending", fake_pending)
 
     body = client.get("/api/v1/feed?scope=jobs", headers=_auth()).json()
 
-    assert seen["do_ingest"] is False
-    assert seen["scope"] == "jobs"
+    assert build_calls["n"] == 0
+    assert seen_pending["scope"] == "jobs"
     assert body["refreshed"] is False
     card = body["items"][0]
     assert card["title"] == "Product Manager"
@@ -206,31 +212,40 @@ def test_m1_feed_does_not_ingest(api, monkeypatch):
     assert card["source"] == "HeadHunter"
 
 
-def test_refresh_feed_ingests(api, monkeypatch):
+def test_refresh_feed_ingests_then_lists_pending(api, monkeypatch):
     client, _ = api
-    seen: dict[str, object] = {}
+    seen_build: dict[str, object] = {}
+    seen_pending: dict[str, object] = {}
 
     async def fake_build(_session, _profile, **kwargs):
-        seen.update(kwargs)
+        seen_build.update(kwargs)
         return []
 
+    async def fake_pending(_session, _profile, **kwargs):
+        seen_pending.update(kwargs)
+        return [_item(title="После refresh")]
+
     monkeypatch.setattr("app.api.routes.digest_service.build_digest", fake_build)
+    monkeypatch.setattr("app.api.routes.digest_service.list_pending", fake_pending)
 
     body = client.post("/api/v1/feed/refresh?scope=talks", headers=_auth()).json()
 
-    assert seen["do_ingest"] is True
-    assert seen["scope"] == "talks"
-    assert body["items"] == []
+    assert seen_build["do_ingest"] is True
+    assert seen_build["scope"] == "talks"
+    assert seen_pending["scope"] == "talks"
+    assert body["refreshed"] is True
+    assert body["items"][0]["title"] == "После refresh"
 
 
 def test_m5_not_ready_profile_gets_409(api, monkeypatch):
     client, state = api
     state.profile = _profile(ready=False)
 
-    async def fail_build(*_args, **_kwargs):  # pragma: no cover — не должен вызваться
-        raise AssertionError("build_digest не должен вызываться для неготового профиля")
+    async def fail(*_args, **_kwargs):  # pragma: no cover
+        raise AssertionError("не должен вызываться для неготового профиля")
 
-    monkeypatch.setattr("app.api.routes.digest_service.build_digest", fail_build)
+    monkeypatch.setattr("app.api.routes.digest_service.build_digest", fail)
+    monkeypatch.setattr("app.api.routes.digest_service.list_pending", fail)
 
     response = client.get("/api/v1/feed", headers=_auth())
     assert response.status_code == 409
