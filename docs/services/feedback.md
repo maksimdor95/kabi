@@ -17,12 +17,14 @@ async def record_reaction(
     *,
     actor_profile_id: UUID | None = None,
 ) -> ReactionResult: ...
-async def list_saved(session, profile) -> list[DigestItem]: ...
+async def list_saved(session, profile, *, channel: str | None = None) -> list[DigestItem]: ...
 ```
 Реакции: `up` | `down` | `hide` | `save` | `unsave`.
 `save` на уже `saved` — toggle (снять с избранного).
 `actor_profile_id` (MU-A): если задан и ≠ `match.profile_id` → `ok=False`,
 `effect=forbidden`, Feedback не пишется. См. `multiuser.md`.
+P1: успешная реакция → `card_reacted`; пустой `list_saved` при `channel` →
+`empty_state` (см. `analytics.md`).
 
 Обучение (M4): на `up`/`down` сдвигаем `Profile.embedding`:
 - up: `normalize(emb + 0.15 * opp_emb)`

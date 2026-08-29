@@ -20,6 +20,7 @@ async def draft_cfp_pitch(profile, opportunity) -> str: ...
 владельца** (MU-A) и возвращает `DraftResult(ok, error, kind, text)`, где
 `error ∈ {not_found, forbidden}`. Проверка живёт здесь, а не в хендлерах, чтобы
 обе поверхности отвечали одинаково.
+P1: успешный черновик → `draft_generated` (см. `analytics.md`).
 
 ## 4. Входы / Выходы
 - **Вход:** профиль + выбранная возможность (из callback `draft:{match_id}`).

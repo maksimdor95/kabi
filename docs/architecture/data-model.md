@@ -88,15 +88,28 @@
 | reaction | text | `up` \| `down` \| `hide` \| `save` |
 | created_at | timestamptz | |
 
+### ProductEvent (P1)
+Product-аналитика без Mixpanel. Спека: `docs/services/analytics.md`.
+
+| Поле | Тип | Заметки |
+|------|-----|---------|
+| id | UUID | PK |
+| profile_id | UUID | FK → Profile |
+| name | text | имя события |
+| props | jsonb | без PII/секретов |
+| created_at | timestamptz | |
+
 ## Связи
 
 ```
 User 1──1 Profile 1──* Match *──1 Opportunity
-                         │
-                         1──* Feedback
+              │          │
+              │          1──* Feedback
+              └──* ProductEvent
 ```
 
-Удаление аккаунта (`/delete`): Feedback → Match → DeadlineReminderLog → Profile → User.
+Удаление аккаунта (`/delete`): Feedback → Match → DeadlineReminderLog →
+ProductEvent → Profile → User.
 Opportunity не удаляется (общая база).
 
 ## Заметки по индексам

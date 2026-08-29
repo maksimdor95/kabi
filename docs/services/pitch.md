@@ -22,7 +22,7 @@ reason_snippet(text, *, limit=REASON_LIMIT_PITCH)  # для talk — 480
 
 # витрина / анти-спам
 list_pending(..., scope="pitch") -> list[DigestItem]
-mark_shown(session, match_ids) -> None
+deliver_feed(session, profile, items, *, scope="pitch", channel) -> list[DigestItem]
 blocked_pitch_orgs(session, profile_id) -> set[str]  # cooldown + penalty
 ```
 
@@ -67,7 +67,7 @@ blocked_pitch_orgs(session, profile_id) -> set[str]  # cooldown + penalty
 - Seed: `vc` имеет `pitch_url` ≠ homepage; `actionable=True` в meta.
 - `card_approach` не пустой при `how_to` в meta.
 - Matching pitch: opp без `actionable` не попадает в candidates.
-- `mark_shown` пишет `shown_at`; повторный rank уважает org cooldown.
+- `deliver_feed` пишет `shown_at` (+ digest_shown); повторный rank уважает org cooldown.
 - Eval (фаза 3): пул `evals/matching/…/pitch_v1` — reason без угла / шаблонный =
   fail.
 

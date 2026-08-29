@@ -20,7 +20,8 @@ async def delete_account(session, telegram_id: int) -> DeleteAccountResult: ...
 
 Полный wipe данных пользователя (не путать с «начать заново» — тот только онбординг/ссылки).
 
-Удаляет: `Feedback` → `Match` → `DeadlineReminderLog` → `Profile` → `User`.
+Удаляет: `Feedback` → `Match` → `DeadlineReminderLog` → `ProductEvent` →
+`Profile` → `User`.
 `Opportunity` (общие вакансии/CFP) **не** трогаем. Локальный файл CV из `raw_cv_ref`
 (если путь внутри `uploads/`) — тоже удаляем.
 

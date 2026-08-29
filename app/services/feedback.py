@@ -185,11 +185,32 @@ async def record_reaction(
         effect,
         learned,
     )
+    from app.services import analytics
+
+    await analytics.emit(
+        session,
+        name="card_reacted",
+        profile_id=match.profile_id,
+        props={
+            "match_id": match_id,
+            "reaction": reaction,
+            "effect": effect,
+            "learned": learned,
+        },
+    )
     return ReactionResult(ok=True, effect=effect, learned=learned)
 
 
-async def list_saved(session: AsyncSession, profile: Profile) -> list[DigestItem]:
-    """Сохранённые в избранное вакансии (Match.status=saved)."""
+async def list_saved(
+    session: AsyncSession,
+    profile: Profile,
+    *,
+    channel: str | None = None,
+) -> list[DigestItem]:
+    """Сохранённые в избранное вакансии (Match.status=saved).
+
+    Если `channel` задан и список пуст — пишем empty_state (bot / miniapp).
+    """
     from app.services.digest import _fmt_item
 
     rows = (
@@ -200,4 +221,14 @@ async def list_saved(session: AsyncSession, profile: Profile) -> list[DigestItem
             .order_by(Match.created_at.desc())
         )
     ).all()
-    return [_fmt_item(match, opp) for match, opp in rows]
+    items = [_fmt_item(match, opp) for match, opp in rows]
+    if not items and channel:
+        from app.services import analytics
+
+        await analytics.emit(
+            session,
+            name="empty_state",
+            profile_id=profile.id,
+            props={"scope": "saved", "channel": channel},
+        )
+    return items

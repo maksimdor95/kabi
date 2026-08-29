@@ -130,8 +130,17 @@ async def draft_for_match(
 
     is_talk = (opp.type or "job") == "talk"
     text = await draft_for_opportunity(profile, opp)
+    kind: DraftKind = "talk_pitch" if is_talk else "cover_letter"
+    from app.services import analytics
+
+    await analytics.emit(
+        session,
+        name="draft_generated",
+        profile_id=profile.id,
+        props={"match_id": match_id, "kind": kind},
+    )
     return DraftResult(
         ok=True,
-        kind="talk_pitch" if is_talk else "cover_letter",
+        kind=kind,
         text=text,
     )

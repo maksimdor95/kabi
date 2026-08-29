@@ -90,6 +90,9 @@ async def on_today(message: Message) -> None:
             reply_markup=menu_for_profile(profile),
         )
         items = await digest_service.build_digest(session, profile, scope="jobs")
+        await digest_service.deliver_feed(
+            session, profile, items, scope="jobs", channel="bot"
+        )
         await session.commit()
 
     if not items:
@@ -126,7 +129,9 @@ async def on_pitch(message: Message) -> None:
         )
         await digest_service.build_digest(session, profile, scope="pitch")
         items = await digest_service.list_pending(session, profile, scope="pitch", limit=7)
-        await digest_service.mark_shown(session, [i.match_id for i in items])
+        await digest_service.deliver_feed(
+            session, profile, items, scope="pitch", channel="bot"
+        )
         await session.commit()
 
     if not items:
@@ -157,7 +162,7 @@ async def on_saved(message: Message) -> None:
             await session.commit()
             await message.answer("Сначала загрузи резюме и пройди онбординг.")
             return
-        items = await feedback_service.list_saved(session, profile)
+        items = await feedback_service.list_saved(session, profile, channel="bot")
         await session.commit()
 
     if not items:
@@ -194,6 +199,15 @@ async def on_talks(message: Message) -> None:
             return
         # Без live HTTP по страницам заявок: данные уже в БД (seed + ночной scheduler).
         items = await deadlines_service.list_upcoming(session, within_days=60)
+        if not items:
+            from app.services import analytics
+
+            await analytics.emit(
+                session,
+                name="empty_state",
+                profile_id=profile.id,
+                props={"scope": "talks", "channel": "bot"},
+            )
         await session.commit()
 
     await message.answer(

@@ -127,6 +127,9 @@ async def _job_digest(
         do_ingest=live,
         limit=5 if live else 3,
     )
+    await digest_service.deliver_feed(
+        session, profile, items, scope="jobs", channel="advisor"
+    )
     if live:
         return _fmt_items(
             items,
@@ -158,6 +161,9 @@ async def _talk_digest(
         do_ingest=live,
         include_talks=True,
         limit=5 if live else 3,
+    )
+    await digest_service.deliver_feed(
+        session, profile, items, scope="talks", channel="advisor"
     )
     if live:
         return _fmt_items(

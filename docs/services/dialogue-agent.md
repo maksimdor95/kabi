@@ -13,10 +13,12 @@ M1 (онбординг + извлечение профиля) ✅; **M9** — с
 ```python
 async def handle_message(session, user, text: str) -> AgentReply: ...
 async def start_onboarding(session, profile) -> AgentReply: ...
-async def continue_onboarding(profile) -> AgentReply: ...
+async def continue_onboarding(session, profile) -> AgentReply: ...
 ```
 `AgentReply` = сообщение пользователю + опциональные кнопки / флаг `finished`
 (после ответа — главное меню).
+P1: шаги эмитят `onboarding_step_entered` / `onboarding_step_completed` /
+`links_added` (см. `analytics.md`).
 
 ## Сценарий онбординга (решено)
 

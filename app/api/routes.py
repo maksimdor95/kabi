@@ -151,8 +151,9 @@ async def _build_feed(
         scope=scope,
         limit=limit,
     )
-    if items:
-        await digest_service.mark_shown(session, [i.match_id for i in items])
+    await digest_service.deliver_feed(
+        session, profile, items, scope=scope, channel="miniapp"
+    )
     logger.info(
         "miniapp_feed tg=%s scope=%s ingest=%s items=%s",
         actor.telegram_id,
@@ -190,7 +191,9 @@ async def get_saved(
     actor: Actor = Depends(current_profile),
     session: AsyncSession = Depends(db_session),
 ) -> list[CardOut]:
-    items = await feedback_service.list_saved(session, actor.owned_profile)
+    items = await feedback_service.list_saved(
+        session, actor.owned_profile, channel="miniapp"
+    )
     return [_card(i, saved=True) for i in items]
 
 

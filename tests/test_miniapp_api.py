@@ -201,10 +201,10 @@ def test_m1_feed_lists_pending_without_ingest(api, monkeypatch):
     monkeypatch.setattr("app.api.routes.digest_service.build_digest", fake_build)
     monkeypatch.setattr("app.api.routes.digest_service.list_pending", fake_pending)
 
-    async def fake_shown(*_a, **_k):
-        return 0
+    async def fake_deliver_feed(session, profile, items, *, scope, channel):
+        return items
 
-    monkeypatch.setattr("app.api.routes.digest_service.mark_shown", fake_shown)
+    monkeypatch.setattr("app.api.routes.digest_service.deliver_feed", fake_deliver_feed)
 
     body = client.get("/api/v1/feed?scope=jobs", headers=_auth()).json()
 
@@ -233,10 +233,10 @@ def test_refresh_feed_ingests_then_lists_pending(api, monkeypatch):
     monkeypatch.setattr("app.api.routes.digest_service.build_digest", fake_build)
     monkeypatch.setattr("app.api.routes.digest_service.list_pending", fake_pending)
 
-    async def fake_shown(*_a, **_k):
-        return 0
+    async def fake_deliver_feed(session, profile, items, *, scope, channel):
+        return items
 
-    monkeypatch.setattr("app.api.routes.digest_service.mark_shown", fake_shown)
+    monkeypatch.setattr("app.api.routes.digest_service.deliver_feed", fake_deliver_feed)
 
     body = client.post("/api/v1/feed/refresh?scope=talks", headers=_auth()).json()
 
@@ -274,7 +274,7 @@ def test_m3_saved_is_scoped_to_own_profile(api, monkeypatch):
     client, state = api
     seen: dict[str, object] = {}
 
-    async def fake_saved(_session, profile):
+    async def fake_saved(_session, profile, **_kwargs):
         seen["profile_id"] = profile.id
         return [_item(title="Head of Product")]
 
@@ -383,7 +383,7 @@ def test_expensive_endpoints_are_rate_limited(api, monkeypatch):
 def test_api_responses_are_not_cached(api, monkeypatch):
     client, _ = api
 
-    async def fake_saved(*_args):
+    async def fake_saved(*_args, **_kwargs):
         return []
 
     monkeypatch.setattr("app.api.routes.feedback_service.list_saved", fake_saved)

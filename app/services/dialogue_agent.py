@@ -137,6 +137,8 @@ async def start_onboarding(session: AsyncSession, profile: Profile) -> AgentRepl
     Сбрасываем source_links и согласие: иначе при «профиле другого человека»
     обогащение подтянет чужой LinkedIn с прошлого прогона.
     """
+    from app.services import analytics
+
     notes: list[str] = []
     await profile_service.update_profile(
         session,
@@ -148,13 +150,27 @@ async def start_onboarding(session: AsyncSession, profile: Profile) -> AgentRepl
     await session.flush()
     if step_idx >= len(STEPS):
         profile_service.refresh_readiness(profile)
+        await analytics.emit(
+            session,
+            name="onboarding_step_completed",
+            profile_id=profile.id,
+            props={"final": True},
+        )
         return AgentReply(text=_DONE_TEXT, finished=True, remove_keyboard=True)
     preface = "\n\n".join(notes) if notes else None
+    await analytics.emit(
+        session,
+        name="onboarding_step_entered",
+        profile_id=profile.id,
+        props={"step": step_idx, "key": STEPS[step_idx].key},
+    )
     return _reply_for_step(step_idx, preface=preface)
 
 
-async def continue_onboarding(profile: Profile) -> AgentReply:
+async def continue_onboarding(session: AsyncSession, profile: Profile) -> AgentReply:
     """Продолжить с текущего шага (без сброса)."""
+    from app.services import analytics
+
     if is_onboarding_complete(profile):
         return AgentReply(text=_DONE_TEXT, finished=True, remove_keyboard=True)
     notes: list[str] = []
@@ -163,6 +179,12 @@ async def continue_onboarding(profile: Profile) -> AgentReply:
     if idx >= len(STEPS):
         return AgentReply(text=_DONE_TEXT, finished=True, remove_keyboard=True)
     preface = "\n\n".join(notes) if notes else None
+    await analytics.emit(
+        session,
+        name="onboarding_step_entered",
+        profile_id=profile.id,
+        props={"step": idx, "key": STEPS[idx].key},
+    )
     return _reply_for_step(idx, preface=preface)
 
 
@@ -218,6 +240,14 @@ async def _handle_links_mid_onboarding(
         profile,
         {"enrichment_consent": True, "source_links": {"links": merged}},
     )
+    from app.services import analytics
+
+    await analytics.emit(
+        session,
+        name="links_added",
+        profile_id=profile.id,
+        props={"n": len(useful), "source": "mid"},
+    )
     summary = await _run_enrichment(session, profile)
     parts = [summary or "Ссылки сохранил."]
     if junk:
@@ -235,6 +265,8 @@ def _is_plain_no(text: str) -> bool:
 async def _advance_onboarding(
     session: AsyncSession, profile: Profile, text: str
 ) -> AgentReply:
+    from app.services import analytics
+
     step_idx = profile.onboarding_step
     step = STEPS[step_idx]
 
@@ -269,11 +301,24 @@ async def _advance_onboarding(
             await profile_service.update_profile(
                 session, profile, {"source_links": {"links": links}}
             )
+            await analytics.emit(
+                session,
+                name="links_added",
+                profile_id=profile.id,
+                props={"n": len(links), "source": "onboarding"},
+            )
             summary = await _run_enrichment(session, profile)
             if summary:
                 preface_parts.append(summary)
         elif profile.enrichment_consent:
             preface_parts.append(_NO_LINKS_NOTE)
+
+    await analytics.emit(
+        session,
+        name="onboarding_step_completed",
+        profile_id=profile.id,
+        props={"step": step_idx, "key": step.key},
+    )
 
     next_idx = step_idx + 1
     next_idx = _skip_ahead(profile, next_idx, preface_parts)
@@ -281,11 +326,23 @@ async def _advance_onboarding(
     await session.flush()
 
     if next_idx < len(STEPS):
+        await analytics.emit(
+            session,
+            name="onboarding_step_entered",
+            profile_id=profile.id,
+            props={"step": next_idx, "key": STEPS[next_idx].key},
+        )
         preface = "\n\n".join(preface_parts) if preface_parts else None
         return _reply_for_step(next_idx, preface=preface)
 
     profile_service.refresh_readiness(profile)
     await session.flush()
+    await analytics.emit(
+        session,
+        name="onboarding_step_completed",
+        profile_id=profile.id,
+        props={"final": True},
+    )
     if profile.ready_for_matching:
         return AgentReply(text=_DONE_TEXT, finished=True)
     missing = _missing_required(profile)
@@ -336,6 +393,14 @@ async def handle_message(session: AsyncSession, user: User, text: str) -> AgentR
         merged = _merge_links(profile, useful)
         await profile_service.update_profile(
             session, profile, {"source_links": {"links": merged}}
+        )
+        from app.services import analytics
+
+        await analytics.emit(
+            session,
+            name="links_added",
+            profile_id=profile.id,
+            props={"n": len(useful), "source": "post"},
         )
         summary = await _run_enrichment(session, profile)
         parts = []

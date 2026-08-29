@@ -73,6 +73,9 @@ async def _send_channel(
                 limit=limit,
                 max_age_hours=max_age,
             )
+            await digest_service.deliver_feed(
+                session, prof, items, scope=scope, channel="scheduler"
+            )
         except Exception as exc:
             logger.warning("digest %s failed tg=%s: %s", channel, telegram_id, exc)
             return -1

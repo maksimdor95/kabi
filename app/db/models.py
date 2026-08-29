@@ -138,3 +138,17 @@ class DeadlineReminderLog(Base):
     sent_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class ProductEvent(Base):
+    """Product analytics (P1). Без PII/секретов в props. Спека: analytics.md."""
+
+    __tablename__ = "product_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    profile_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("profiles.id"), index=True)
+    name: Mapped[str] = mapped_column(String, index=True)
+    props: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )

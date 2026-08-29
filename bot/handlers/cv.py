@@ -106,7 +106,7 @@ async def on_document(message: Message, bot: Bot) -> None:
             await message.answer(_merge_after_cv(reply), reply_markup=markup)
             return
 
-        reply = await dialogue_agent.continue_onboarding(profile)
+        reply = await dialogue_agent.continue_onboarding(session, profile)
         await session.commit()
 
     markup = reply_keyboard(reply.buttons) if reply.buttons else None

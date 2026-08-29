@@ -11,14 +11,19 @@ M2 (ежедневная подборка), M3 (напоминания о дед
 ```python
 async def build_digest(session, profile, *, scope, do_ingest=True, limit=7, …) -> list[DigestItem]: ...
 async def list_pending(session, profile, *, scope, limit=7) -> list[DigestItem]: ...
+async def mark_shown(session, match_ids) -> int: ...
+async def deliver_feed(session, profile, items, *, scope, channel) -> list[DigestItem]: ...
 ```
 `scope`: `jobs` | `pitch` | `talks`.
+`channel`: `bot` | `miniapp` | `scheduler` | `advisor`.
 
 - `build_digest` — создать **новые** Match (опционально с ingest). Возвращает
   только что созданные; если кандидаты уже сматчены раньше → `[]`.
 - `list_pending` — витрина: уже существующие `Match.status=new` по scope
   (то, на что ещё не было реакции). Так работает Mini App: открытие не
   выглядит пустым, пока в карманах бота лежат неотреагированные карточки.
+- `deliver_feed` — единая точка показа: `mark_shown` + `digest_shown` или
+  `empty_state` (см. `docs/services/analytics.md`).
 
 Поля карточки (`app/services/cards.py`) — presentation-neutral и общие для всех
 каналов: `format_salary`, `card_title`, `card_summary`, `reason_snippet`,
@@ -49,6 +54,7 @@ JSON в `app/api`.
 
 ## 10. Статус
 M2/M3 в проде: `/today`, `/pitch`, `/talks` + рассылка по расписанию.
-M11: `GET /api/v1/feed` → `list_pending` + `mark_shown`; `POST /feed/refresh` →
+M11: `GET /api/v1/feed` → `list_pending` + `deliver_feed`; `POST /feed/refresh` →
 `build_digest` + витрина. Pitch 2.0: блок «Как зайти», CTA без homepage.
 Общие поля карточки в `app/services/cards.py`. См. `docs/services/pitch.md`.
+P1: impressions/empty через `deliver_feed` → `product_events`.

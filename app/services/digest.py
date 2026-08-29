@@ -157,6 +157,44 @@ async def mark_shown(session: AsyncSession, match_ids: list[str]) -> int:
     return int(rowcount or 0)
 
 
+async def deliver_feed(
+    session: AsyncSession,
+    profile: Profile,
+    items: list[DigestItem],
+    *,
+    scope: MatchScope,
+    channel: str,
+) -> list[DigestItem]:
+    """Зафиксировать показ (digest_shown + shown_at) или empty_state.
+
+    Единая точка для bot / Mini App / scheduler — analytics не дублируется в каналах.
+    """
+    from app.services import analytics
+
+    if not items:
+        await analytics.emit(
+            session,
+            name="empty_state",
+            profile_id=profile.id,
+            props={"scope": scope, "channel": channel},
+        )
+        return items
+
+    await mark_shown(session, [i.match_id for i in items])
+    await analytics.emit(
+        session,
+        name="digest_shown",
+        profile_id=profile.id,
+        props={
+            "scope": scope,
+            "n": len(items),
+            "match_ids": [i.match_id for i in items],
+            "channel": channel,
+        },
+    )
+    return items
+
+
 async def build_digest(
     session: AsyncSession,
     profile: Profile,

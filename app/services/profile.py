@@ -13,7 +13,7 @@ from pathlib import Path
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import DeadlineReminderLog, Feedback, Match, Profile, User
+from app.db.models import DeadlineReminderLog, Feedback, Match, ProductEvent, Profile, User
 from app.domain.profile import ProfileDraft
 from app.llm import client as llm
 from app.observability.logging import get_logger
@@ -100,6 +100,9 @@ async def delete_account(session: AsyncSession, telegram_id: int) -> DeleteAccou
         await session.execute(
             delete(DeadlineReminderLog).where(DeadlineReminderLog.profile_id == profile.id)
         )
+        await session.execute(
+            delete(ProductEvent).where(ProductEvent.profile_id == profile.id)
+        )
         await session.delete(profile)
 
     await session.delete(user)
@@ -152,6 +155,18 @@ async def apply_cv_draft(
 
     refresh_readiness(profile)
     await session.flush()
+
+    from app.services import analytics
+
+    await analytics.emit(
+        session,
+        name="cv_uploaded",
+        profile_id=profile.id,
+        props={
+            "roles_n": len(profile.roles or []),
+            "skills_n": len(profile.skills or []),
+        },
+    )
     return profile
 
 
