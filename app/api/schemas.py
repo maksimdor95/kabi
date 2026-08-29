@@ -54,11 +54,14 @@ class CardOut(BaseModel):
     score: float = 0.0
     reason: str | None = None
     summary: str | None = None
+    approach: str | None = None  # Pitch 2.0: «Как зайти»
+    how: str | None = None
     url: str | None = None
     link_label: str | None = None
     source: str | None = None
     deadline: datetime | None = None
     saved: bool = False
+    draft_primary: bool = False  # talk без tips-URL → питч как primary CTA
 
 
 class FeedOut(BaseModel):

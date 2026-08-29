@@ -124,14 +124,16 @@ async def on_pitch(message: Message) -> None:
             "Подбираю СМИ и подкасты… 🎙️",
             reply_markup=menu_for_profile(profile),
         )
-        items = await digest_service.build_digest(session, profile, scope="pitch")
+        await digest_service.build_digest(session, profile, scope="pitch")
+        items = await digest_service.list_pending(session, profile, scope="pitch", limit=7)
+        await digest_service.mark_shown(session, [i.match_id for i in items])
         await session.commit()
 
     if not items:
         await message.answer(
-            "Пока нет подходящих СМИ/подкастов под твои темы. "
-            "Пока нет подходящих СМИ/подкастов под твои темы. "
-            "Конференции со сроком подачи — /talks, вакансии — /today."
+            "Сейчас нет свежих площадок под твои темы — не добиваю мусором.\n"
+            "Мониторю СМИ и подкасты; когда появится actionable вход — пришлю.\n"
+            "Конференции со сроком — /talks, вакансии — /today."
         )
         return
 
@@ -139,7 +141,7 @@ async def on_pitch(message: Message) -> None:
     for item in items:
         await message.answer(
             format_card(item),
-            reply_markup=card_keyboard(item.match_id),
+            reply_markup=card_keyboard(item.match_id, draft_label="✍️ Питч"),
             parse_mode="HTML",
             disable_web_page_preview=True,
         )

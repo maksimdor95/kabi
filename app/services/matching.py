@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from sqlalchemy import select
@@ -33,6 +33,9 @@ _INACTIVE_TALK_STATUS = frozenset({"closed", "watch"})
 # Конференции/CFP — только в /talks.
 _CFP_KINDS = frozenset({"conference"})
 _CFP_HOWS = frozenset({"cfp_talk"})
+# Pitch 2.0 anti-spam
+_ORG_COOLDOWN_DAYS = 30
+_ORG_PENALTY_DAYS = 90
 
 MatchScope = Literal["jobs", "pitch", "talks"]
 RankMode = Literal["fresh_relevant", "relevant"]
@@ -92,6 +95,63 @@ def is_evergreen_pitch(opp: Opportunity) -> bool:
     if kind in _CFP_KINDS or how in _CFP_HOWS:
         return False
     return True
+
+
+def is_actionable_pitch_opp(opp: Opportunity) -> bool:
+    """Порог качества Pitch 2.0: без next step не в топ /pitch."""
+    meta = getattr(opp, "meta", None) or {}
+    if not isinstance(meta, dict):
+        return False
+    if meta.get("actionable") is True:
+        return True
+    if meta.get("actionable") is False:
+        return False
+    if isinstance(meta.get("how_to"), str) and len(meta["how_to"].strip()) >= 40:
+        return True
+    for key in ("pitch_url", "cfp_url"):
+        url = meta.get(key)
+        if isinstance(url, str) and url.strip():
+            return True
+    return False
+
+
+async def blocked_pitch_orgs(session: AsyncSession, profile_id) -> set[str]:
+    """Org cooldown (после shown) и penalty (после 👎/🙈) для evergreen pitch."""
+    now = datetime.now(timezone.utc)
+    cooldown_cut = now - timedelta(days=_ORG_COOLDOWN_DAYS)
+    penalty_cut = now - timedelta(days=_ORG_PENALTY_DAYS)
+    rows = (
+        await session.execute(
+            select(Match, Opportunity)
+            .join(Opportunity, Opportunity.id == Match.opportunity_id)
+            .where(Match.profile_id == profile_id, Opportunity.type == "talk")
+        )
+    ).all()
+    blocked: set[str] = set()
+    for match, opp in rows:
+        if not is_evergreen_pitch(opp):
+            continue
+        org = (opp.org or "").strip()
+        if not org:
+            continue
+        key = org.casefold()
+        if match.status in {"disliked", "hidden"}:
+            created = match.created_at
+            if created is not None:
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                if created >= penalty_cut:
+                    blocked.add(key)
+            else:
+                blocked.add(key)
+            continue
+        shown = match.shown_at
+        if shown is not None:
+            if shown.tzinfo is None:
+                shown = shown.replace(tzinfo=timezone.utc)
+            if shown >= cooldown_cut:
+                blocked.add(key)
+    return blocked
 
 
 def _tokens(texts: list[str]) -> set[str]:
@@ -294,6 +354,7 @@ async def _rank_type(
     evergreen_only: bool = False,
     rank_mode: RankMode = "fresh_relevant",
     max_age_hours: float | None = None,
+    blocked_orgs: set[str] | None = None,
 ) -> list[Candidate]:
     dist = Opportunity.embedding.cosine_distance(profile.embedding).label("dist")
     stmt = (
@@ -304,6 +365,7 @@ async def _rank_type(
     )
     rows = (await session.execute(stmt)).all()
     now = datetime.now(timezone.utc)
+    blocked = blocked_orgs or set()
     scored: list[Candidate] = []
     for opp, distance in rows:
         if opp.id in seen_matched:
@@ -312,6 +374,12 @@ async def _rank_type(
             continue
         if evergreen_only and not is_evergreen_pitch(opp):
             continue
+        if evergreen_only and not is_actionable_pitch_opp(opp):
+            continue
+        if evergreen_only and blocked:
+            org_key = (opp.org or "").strip().casefold()
+            if org_key and org_key in blocked:
+                continue
         if max_age_hours is not None:
             ft = opp.fetched_at
             if ft is None:
@@ -348,6 +416,7 @@ async def rank_candidates(
         return []
 
     seen_matched = await _already_matched_ids(session, profile.id)
+    blocked = await blocked_pitch_orgs(session, profile.id) if scope == "pitch" else set()
     kw = dict(
         limit=limit,
         seen_matched=seen_matched,
@@ -356,7 +425,12 @@ async def rank_candidates(
     )
     if scope == "pitch":
         return await _rank_type(
-            session, profile, "talk", evergreen_only=True, **kw  # type: ignore[arg-type]
+            session,
+            profile,
+            "talk",
+            evergreen_only=True,
+            blocked_orgs=blocked,
+            **kw,  # type: ignore[arg-type]
         )
     if scope == "talks":
         return await _rank_type(

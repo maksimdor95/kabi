@@ -280,6 +280,12 @@ body {
   font-weight: 600;
 }
 
+.act--primary {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: transparent;
+  color: var(--accent);
+}
+
 .act[disabled] {
   opacity: 0.5;
   cursor: default;

@@ -71,7 +71,8 @@ def test_parse_event_deadline():
     assert ev.deadline.month == 8
     assert ev.deadline.day == 24
     assert "Autonomy" in ev.topics or "Planning" in ev.topics
-    assert ev.open is True  # deadline in future relative to "today" Jul 2026
+    # open = deadline ещё в будущем относительно «сейчас»
+    assert ev.open is (ev.deadline > datetime.now(timezone.utc))
 
 
 def test_event_to_draft():

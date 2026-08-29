@@ -40,22 +40,26 @@ _FEED_LIMIT_MAX = 30
 
 def _card(item: DigestItem, *, saved: bool = False) -> CardOut:
     title, org = cards.card_title(item)
+    is_talk = item.opp_type == "talk"
     return CardOut(
         match_id=item.match_id,
-        type="talk" if item.opp_type == "talk" else "job",
+        type="talk" if is_talk else "job",
         title=title,
         org=org,
         location=item.location,
         remote=item.remote,
         salary=cards.format_salary(item.salary),
         score=round(item.score, 4),
-        reason=cards.reason_snippet(item.reason),
+        reason=cards.card_reason(item),
         summary=cards.card_summary(item, title=title),
+        approach=cards.card_approach(item),
+        how=item.how,
         url=item.url,
         link_label=item.link_label,
         source=cards.format_source_label(item.source),
         deadline=item.deadline,
         saved=saved,
+        draft_primary=is_talk and (item.hide_url or not item.link_label),
     )
 
 
@@ -147,6 +151,8 @@ async def _build_feed(
         scope=scope,
         limit=limit,
     )
+    if items:
+        await digest_service.mark_shown(session, [i.match_id for i in items])
     logger.info(
         "miniapp_feed tg=%s scope=%s ingest=%s items=%s",
         actor.telegram_id,

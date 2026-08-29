@@ -190,6 +190,8 @@ async def record_reaction(
 
 async def list_saved(session: AsyncSession, profile: Profile) -> list[DigestItem]:
     """Сохранённые в избранное вакансии (Match.status=saved)."""
+    from app.services.digest import _fmt_item
+
     rows = (
         await session.execute(
             select(Match, Opportunity)
@@ -198,23 +200,4 @@ async def list_saved(session: AsyncSession, profile: Profile) -> list[DigestItem
             .order_by(Match.created_at.desc())
         )
     ).all()
-    items: list[DigestItem] = []
-    for match, opp in rows:
-        items.append(
-            DigestItem(
-                match_id=str(match.id),
-                score=match.score,
-                reason=match.reason or "",
-                title=opp.title,
-                org=opp.org,
-                location=opp.location,
-                remote=opp.remote,
-                salary=opp.salary,
-                url=opp.url,
-                source=opp.source,
-                opp_type=opp.type or "job",
-                deadline=opp.deadline,
-                description=opp.description,
-            )
-        )
-    return items
+    return [_fmt_item(match, opp) for match, opp in rows]

@@ -47,7 +47,9 @@ deadline и отсутствие пересечения тем (`speaking_topics
 
 Потоки (lane):
 - `/today` / утренняя рассылка: только **вакансии** (`scope=jobs`).
-- `/pitch`: только **evergreen-питч** (`is_evergreen_pitch`) — СМИ/подкасты без дедлайна.
+- `/pitch`: только **evergreen-питч** (`is_evergreen_pitch`) — СМИ/подкасты без дедлайна;
+  без `actionable` next step не в топ; org cooldown 30д после `shown_at`,
+  org penalty 90д после 👎/🙈 (Pitch 2.0, `docs/services/pitch.md`).
 - `/talks`: конференции с реальной датой CFP (`deadlines.list_upcoming`).
 
 M4: ranking использует `Profile.embedding`, который сдвигается реакциями 👍/👎

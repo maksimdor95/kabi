@@ -2,7 +2,12 @@
 
 import asyncio
 
-from app.ingestion.talks.seed_connector import TalkPlacesConnector, load_places, place_to_draft
+from app.ingestion.talks.seed_connector import (
+    TalkPlacesConnector,
+    is_actionable_place,
+    load_places,
+    place_to_draft,
+)
 from app.ingestion.talks.url_quality import is_actionable_cfp_url
 
 
@@ -74,6 +79,33 @@ def test_place_to_draft_talk_with_deadline():
     assert draft.meta["topics"] == ["product", "skills"]
 
 
+def test_vc_pitch_url_is_not_homepage():
+    places = {p["id"]: p for p in load_places()}
+    vc = places["vc"]
+    assert vc["pitch_url"] == "https://vc.ru/write"
+    assert vc["pitch_url"] != vc["url"]
+    draft = place_to_draft(vc)
+    assert draft.meta["pitch_url"] == "https://vc.ru/write"
+    assert draft.meta["actionable"] is True
+    assert draft.meta["how_to"]
+    assert draft.url == "https://vc.ru/write"
+
+
+def test_place_without_howto_not_actionable():
+    place = {
+        "id": "bare",
+        "name": "Bare Mag",
+        "kind": "media",
+        "how": "column",
+        "url": "https://example.com/",
+        "topics": ["product"],
+    }
+    assert is_actionable_place(place) is False
+    draft = place_to_draft(place)
+    assert draft.meta["actionable"] is False
+    assert draft.meta["pitch_url"] is None
+
+
 def test_media_has_no_invented_deadline():
     place = {
         "id": "media1",
@@ -81,10 +113,12 @@ def test_media_has_no_invented_deadline():
         "kind": "media",
         "how": "expert_comment",
         "url": "https://example.com",
+        "how_to": "Напиши редакции короткий комментарий на 800 знаков с должностью.",
         "topics": ["skills"],
     }
     draft = place_to_draft(place)
     assert draft.deadline is None
+    assert draft.meta["actionable"] is True
     assert draft.url == "https://example.com"
 
 

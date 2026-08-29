@@ -201,6 +201,11 @@ def test_m1_feed_lists_pending_without_ingest(api, monkeypatch):
     monkeypatch.setattr("app.api.routes.digest_service.build_digest", fake_build)
     monkeypatch.setattr("app.api.routes.digest_service.list_pending", fake_pending)
 
+    async def fake_shown(*_a, **_k):
+        return 0
+
+    monkeypatch.setattr("app.api.routes.digest_service.mark_shown", fake_shown)
+
     body = client.get("/api/v1/feed?scope=jobs", headers=_auth()).json()
 
     assert build_calls["n"] == 0
@@ -227,6 +232,11 @@ def test_refresh_feed_ingests_then_lists_pending(api, monkeypatch):
 
     monkeypatch.setattr("app.api.routes.digest_service.build_digest", fake_build)
     monkeypatch.setattr("app.api.routes.digest_service.list_pending", fake_pending)
+
+    async def fake_shown(*_a, **_k):
+        return 0
+
+    monkeypatch.setattr("app.api.routes.digest_service.mark_shown", fake_shown)
 
     body = client.post("/api/v1/feed/refresh?scope=talks", headers=_auth()).json()
 

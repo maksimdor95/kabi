@@ -49,6 +49,6 @@ JSON в `app/api`.
 
 ## 10. Статус
 M2/M3 в проде: `/today`, `/pitch`, `/talks` + рассылка по расписанию.
-M11: `GET /api/v1/feed` → `list_pending` (мгновенно); `POST /feed/refresh` →
-`build_digest` (ingest+новые Match) + снова `list_pending`. Общие поля карточки
-в `app/services/cards.py`.
+M11: `GET /api/v1/feed` → `list_pending` + `mark_shown`; `POST /feed/refresh` →
+`build_digest` + витрина. Pitch 2.0: блок «Как зайти», CTA без homepage.
+Общие поля карточки в `app/services/cards.py`. См. `docs/services/pitch.md`.

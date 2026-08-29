@@ -1,20 +1,16 @@
 # Каталог мест, куда менеджеру ходить за возможностями выступить / дать экспертность.
 #
-# Выведен на примере реального медиа-следа product/HR-tech эксперта
-# (публикации, эфиры, колонки). Это НЕ заточка под одного человека:
-# набор площадок типичен для Head of Product / CPO / skill-based / EdTech / HR-tech.
+# kind: media | podcast | tv | conference | community
+# how: expert_comment | column | interview | podcast_guest | cfp_talk | workshop
 #
-# kind:
-#   media      — СМИ / отраслевые издания (коммент, колонка, интервью)
-#   podcast    — подкасты / YouTube / аудио
-#   tv         — ТВ / крупные эфиры
-#   conference — сценические конференции (часто с CFP)
-#   community  — отраслевые площадки / edu-медиа
+# Pitch 2.0 (P0) — доп. поля:
+#   pitch_url       — страница подачи / tips / редактор (НЕ homepage)
+#   how_to          — 1–3 предложения: как зайти
+#   example_topics  — углы, которые сюда заходят
+#   contact_hint    — куда писать (только если публично известно; без выдумок)
 #
-# how (что предлагать):
-#   expert_comment | column | interview | podcast_guest | cfp_talk | workshop
-#
-# Статус M3: seed → Opportunity(type=talk). Живые парсеры CFP — позже по месту.
+# actionable = есть pitch_url | cfp_url | how_to → иначе площадка не в топ /pitch.
+# Дедлайны у evergreen не выдумываем. CFP-конференции — data/open_cfp.yaml.
 
 places:
   # --- Деловые СМИ (экспертный коммент / колонка) ---
@@ -86,6 +82,10 @@ places:
     kind: media
     how: interview
     url: https://www.forbes.ru/
+    pitch_url: https://www.forbes.ru/forbes-life
+    how_to: "Собери кейс с цифрами (рост метрики, запуск, орг. изменение) на 1 страницу и предложи интервью через форму/редакцию Forbes Russia. Без «хочу рассказать о себе» — только конкретный инсайт."
+    example_topics: [запуск B2B-продукта, skill-based найм, AI в продукте]
+    contact_hint: "Редакция Forbes Russia — через сайт / пресс-службу компании-героя"
     topics: [IT-навыки, образование, карьера]
   - id: forbes-life
     enabled: false
@@ -143,84 +143,122 @@ places:
     kind: media
     how: expert_comment
     url: https://www.cnews.ru/
+    pitch_url: https://www.cnews.ru/news
+    how_to: "Подготовь экспертный комментарий на свежий IT/HR-tech инфоповод (3–5 абзацев + должность). Пиши в редакцию CNews с темой письма и ссылкой на свою экспертизу."
+    example_topics: [цифровая трансформация, навыки IT, продукт в enterprise]
+    contact_hint: "news@cnews.ru (типовой ящик редакции; уточняй на сайте)"
     topics: [IT-навыки, HeadHunter, цифровая трансформация, топ-менеджеры]
   - id: vc
     name: vc.ru
     kind: media
     how: column
     url: https://vc.ru/
+    pitch_url: https://vc.ru/write
+    how_to: "Зарегистрируйся и опубликуй колонку через редактор vc.ru/write. Сильный заход — разбор своего кейса (метрика до/после), без рекламы курса. Перед публикацией сверься с правилами площадки."
+    example_topics: [product discovery, skill-based, marketplace, рост активации]
+    contact_hint: "Редактор vc.ru — через интерфейс публикации"
     topics: [skill-based, hh.ru, методология навыков, алгоритмы, продукт, product]
   - id: hh-media
     name: hh.ru (редакция / экспертные статьи)
     kind: media
     how: column
     url: https://hh.ru/article
+    pitch_url: https://hh.ru/article
+    how_to: "Предложи колонку про рынок труда / навыки / продукт найма: тезис, 3 факта, вывод для HR или кандидата. Пиши в редакцию медиа hh.ru с черновиком 4–6 тыс. знаков."
+    example_topics: [skill-based hiring, продуктовый найм, калькулятор навыков]
     topics: [навыки, skill-based, рынок труда, калькулятор навыков]
   - id: comnews
     name: ComNews
     kind: media
     how: expert_comment
     url: https://www.comnews.ru/
+    how_to: "Отправь редакции короткий expert comment к отраслевой новости (IT/телеком/скиллы): 800–1200 знаков, должность, компания. Без рекламных ссылок."
+    example_topics: [подтверждение навыков, IT-кадры, digital]
     topics: [подтверждение навыков, IT-компании, скиллы]
   - id: computerra
     name: Computerra
     kind: media
     how: column
     url: https://www.computerra.ru/
+    how_to: "Предложи колонку про tech/education/skills: оглавление из 5 пунктов и лид на 500 знаков. Редакция отбирает по практической пользе, не по «мысли о будущем»."
+    example_topics: [skill-based, сертификаты, обучение продактов]
     topics: [skill-based, курсы, образование, сертификаты]
   - id: tadviser
     name: TAdviser
     kind: media
     how: expert_comment
     url: https://www.tadviser.ru/
+    how_to: "Для TAdviser готовь экспертный комментарий к enterprise/HR-tech материалу или краткий обзор практики внедрения. Упор на цифры и роль продукта."
+    example_topics: [HR-tech, цифровая трансформация, продукт в крупной компании]
     topics: [IT, HR-tech, навыки, цифровая трансформация]
   - id: inc
     name: Inc. Russia
     kind: media
     how: interview
     url: https://incrussia.ru/
+    pitch_url: https://incrussia.ru/
+    how_to: "Собери pitch на интервью: один сильный кейс (AI/продукт/рост) + почему сейчас. Пиши редакции Inc. Russia с био в 5 строк и 3 вопросами, на которые готов ответить."
+    example_topics: [AI-продукт, стартап→scale, IT-рынок]
     topics: [AI, цифровые навыки, IT-рынок, продукт]
   - id: secret-mag
     name: Secret Mag
     kind: media
     how: expert_comment
     url: https://secretmag.ru/
+    how_to: "Короткий комментарий к тренду (ChatGPT, найм, продукт) — 600–1000 знаков, без корпоративного пресс-релиза. Предлагай редакции под конкретный материал."
+    example_topics: [AI в работе продакта, программисты vs продукт]
     topics: [ChatGPT, программисты, IT]
   - id: the-hrd
     name: The HRD
     kind: media
     how: column
     url: https://thehrd.ru/
+    pitch_url: https://thehrd.ru/
+    how_to: "Колонка для HR-аудитории: практика skill-based / L&D / продуктовый взгляд на кадры. Пришли тему + план на 5 блоков + лид."
+    example_topics: [skill-based, корпоративное обучение, продукт и HR]
     topics: [skill-based, HR, корпоративное обучение]
   - id: hightech
     name: HighTech FM / HighTech
     kind: podcast
     how: podcast_guest
     url: https://hightech.fm/
+    pitch_url: https://hightech.fm/
+    how_to: "Предложи себя гостем: тема выпуска, почему ты, 3 тезиса и ссылка на прошлый эфир/статью. Пиши продюсеру HighTech с коротким bio."
+    example_topics: [технологии и навыки, продукт, IT-калькулятор]
+    contact_hint: "Продюсеры HighTech — через контакты на hightech.fm"
     topics: [IT-калькулятор, навыки, технологии, продукт]
   - id: theoryandpractice
     name: Theory and Practice
     kind: community
     how: interview
     url: https://theoryandpractice.ru/
+    how_to: "Предложи интервью/разбор: тема про навыки и рынок труда с личным кейсом. Короткий pitch + ссылки на материалы."
+    example_topics: [требования к навыкам, смена роли, обучение]
     topics: [требования к навыкам, рынок труда]
   - id: setters
     name: Setters
     kind: community
     how: interview
     url: https://setters.media/
+    pitch_url: https://setters.media/
+    how_to: "Setters любит тренды будущего работы и продукт. Предложи тему эфира/текста: один провокационный тезис + доказательство из практики."
+    example_topics: [будущее работы, продуктовые тренды]
     topics: [будущее работы, тренды, продукт]
   - id: sravni
     name: Сравни.ру
     kind: media
     how: expert_comment
     url: https://www.sravni.ru/
+    how_to: "Экспертный комментарий к материалу про карьеру/IT/финтех: 3–5 практических советов. Пиши редакции с должностью и зоной экспертизы."
+    example_topics: [IT-карьера, навыки, fintech-продукт]
     topics: [IT-навыки, карьера]
   - id: it-speaker
     name: IT Speaker
     kind: community
     how: interview
     url: https://itspeaker.ru/
+    how_to: "Предложи спикерский слот / интервью: тема, аудитория, 3 takeaway. Приложи прошлые выступления."
+    example_topics: [продукт, навыки, IT]
     topics: [калькулятор навыков, IT, продукт]
 
   # --- EdTech / обучение ---
@@ -229,12 +267,17 @@ places:
     kind: community
     how: interview
     url: https://skillbox.ru/media/
+    pitch_url: https://skillbox.ru/media/
+    how_to: "Предложи экспертное интервью или колонку в медиа Skillbox: тема обучения/карьеры в IT с личным кейсом. Пиши редакции media с планом."
+    example_topics: [карьера продакта, обучение, skills]
     topics: [IT-навыки, обучение, карьера, продукт]
   - id: skillfactory
     name: Skillfactory
     kind: community
     how: workshop
     url: https://skillfactory.ru/
+    how_to: "Предложи воркшоп / гостевой эфир: программа на 60–90 минут, для кого, какой результат. Пиши в партнёрства/контент Skillfactory."
+    example_topics: [управление IT-продуктом, EdTech, discovery]
     topics: [управление IT-продуктом, EdTech, продукт, product]
 
   # --- ТВ ---

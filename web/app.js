@@ -19,7 +19,7 @@
 
   const EMPTY_HINTS = {
     jobs: ["inbox", "Свежих вакансий нет", "Нажми «Обновить» — схожу в источники прямо сейчас."],
-    pitch: ["mic", "Пока нет СМИ и подкастов", "Обнови или добавь темы экспертности в чате."],
+    pitch: ["mic", "Пока нет свежих СМИ и подкастов", "Не добиваю мусором — мониторю площадки и пингану, когда появится вход."],
     talks: ["stage", "Нет конференций со сроком подачи", "Нажми «Обновить» — поищу новые."],
     saved: ["bookmark", "В избранном пусто", "Жми «В избранное» на карточке — вернёшься сюда."],
   };
@@ -226,12 +226,15 @@
     const root = node("article", "card");
     root.dataset.matchId = card.match_id;
 
-    if (card.type === "talk") root.appendChild(node("div", "card__badge", "Выступление"));
+    if (card.type === "talk") {
+      root.appendChild(node("div", "card__badge", "СМИ / питч"));
+    }
 
     root.appendChild(node("h3", "card__title", card.title));
     if (card.org) root.appendChild(node("div", "card__org", card.org));
 
     const chips = node("div", "chips");
+    if (card.how) chips.appendChild(node("span", "chip", formatHow(card.how)));
     if (card.salary) chips.appendChild(node("span", "chip chip--accent", card.salary));
     if (card.location) chips.appendChild(node("span", "chip", card.location));
     if (card.remote) chips.appendChild(node("span", "chip", "удалённо"));
@@ -240,7 +243,12 @@
     if (card.source) chips.appendChild(node("span", "chip", card.source));
     if (chips.childElementCount) root.appendChild(chips);
 
-    if (card.summary) {
+    if (card.type === "talk" && card.approach) {
+      const block = node("p", "card__block");
+      block.appendChild(node("b", null, "Как зайти: "));
+      block.appendChild(document.createTextNode(card.approach));
+      root.appendChild(block);
+    } else if (card.summary) {
       const block = node("p", "card__block");
       block.appendChild(node("b", null, "Суть: "));
       block.appendChild(document.createTextNode(card.summary));
@@ -254,8 +262,8 @@
       root.appendChild(reason);
     }
 
-    if (card.url) {
-      const link = node("a", "card__link", card.link_label || "Открыть →");
+    if (card.url && card.link_label) {
+      const link = node("a", "card__link", card.link_label);
       link.href = card.url;
       link.addEventListener("click", (event) => {
         event.preventDefault();
@@ -268,6 +276,18 @@
 
     root.appendChild(buildActions(card, root, context));
     return root;
+  }
+
+  function formatHow(how) {
+    const map = {
+      expert_comment: "комментарий",
+      column: "колонка",
+      interview: "интервью",
+      podcast_guest: "гость эфира",
+      cfp_talk: "CFP",
+      workshop: "воркшоп",
+    };
+    return map[how] || how;
   }
 
   function actionButton(iconName, label, className) {
@@ -296,8 +316,12 @@
     const hide = actionButton("hide", "Скрыть");
     const draft = actionButton(
       "draft",
-      card.type === "talk" ? "Черновик заявки" : "Сопроводительное письмо",
-      "act--wide"
+      card.type === "talk"
+        ? card.draft_primary
+          ? "Черновик питча"
+          : "Черновик заявки"
+        : "Сопроводительное письмо",
+      card.draft_primary ? "act--wide act--primary" : "act--wide"
     );
 
     async function react(reaction, button) {

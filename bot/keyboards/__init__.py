@@ -14,11 +14,12 @@ from aiogram.types import (
 )
 
 from app.services.cards import (
+    card_approach,
+    card_reason,
     card_summary,
     card_title,
     format_salary,
     format_source_label,
-    reason_snippet,
 )
 from app.services.digest import DigestItem
 
@@ -107,14 +108,21 @@ def menu_for_profile(profile: object | None) -> ReplyKeyboardMarkup:
 
 
 def format_card(item: DigestItem, *, show_source: bool = False) -> str:
-    """Карточка в духе Getmatch: роль → работодатель → ЗП/локация → суть → почему ты."""
-    badge = "🎤 " if item.opp_type == "talk" else ""
+    """Карточка: job — суть/почему ты; talk/pitch — формат + как зайти + почему ты."""
+    is_talk = item.opp_type == "talk"
+    badge = "🎤 " if is_talk else ""
     title, org = card_title(item)
 
     lines = [f"<b>{badge}{title}</b>"]
 
     if org:
         lines.append(f"<b>🏢 {org}</b>")
+
+    if is_talk and item.how:
+        from app.ingestion.talks.seed_connector import _HOW_LABEL
+
+        how_s = _HOW_LABEL.get(item.how, item.how)
+        lines.append(f"Формат: {how_s}")
 
     salary = format_salary(item.salary)
     if salary:
@@ -131,12 +139,18 @@ def format_card(item: DigestItem, *, show_source: bool = False) -> str:
     if item.deadline:
         lines.append("⏰ Дедлайн: " + item.deadline.strftime("%d.%m.%Y"))
 
-    summary = card_summary(item, title=title)
-    if summary:
-        lines.append("")
-        lines.append(f"<b>Суть:</b> {summary}")
+    if is_talk:
+        approach = card_approach(item)
+        if approach:
+            lines.append("")
+            lines.append(f"<b>Как зайти:</b> {approach}")
+    else:
+        summary = card_summary(item, title=title)
+        if summary:
+            lines.append("")
+            lines.append(f"<b>Суть:</b> {summary}")
 
-    reason = reason_snippet(item.reason)
+    reason = card_reason(item)
     if reason:
         lines.append("")
         lines.append(f"<b>Почему ты:</b> {reason}")
@@ -146,17 +160,19 @@ def format_card(item: DigestItem, *, show_source: bool = False) -> str:
         if src:
             lines.append(f"<i>{src}</i>")
 
-    if item.url:
+    if item.url and item.link_label:
         lines.append("")
-        label = item.link_label or (
-            "Открыть сайт →" if item.opp_type == "talk" else "Открыть вакансию →"
-        )
-        lines.append(f'<a href="{item.url}">{label}</a>')
+        lines.append(f'<a href="{item.url}">{item.link_label}</a>')
 
     return "\n".join(lines)
 
 
-def card_keyboard(match_id: str, *, saved: bool = False) -> InlineKeyboardMarkup:
+def card_keyboard(
+    match_id: str,
+    *,
+    saved: bool = False,
+    draft_label: str = "✍️ Сопроводительное",
+) -> InlineKeyboardMarkup:
     def cb(action: str) -> str:
         return f"fb:{action}:{match_id}"
 
@@ -178,7 +194,7 @@ def card_keyboard(match_id: str, *, saved: bool = False) -> InlineKeyboardMarkup
             [
                 # draft: — отдельный хендлер (не fb:), иначе «Уже неактуально».
                 InlineKeyboardButton(
-                    text="✍️ Сопроводительное",
+                    text=draft_label,
                     callback_data=f"draft:{match_id}",
                 ),
             ],

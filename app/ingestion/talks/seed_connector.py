@@ -4,7 +4,8 @@
 Для conference с cfp_url — живой парсер страницы заявки (дедлайн/статус).
 Медиа/подкасты без даты в seed — без дедлайна (evergreen-питч, не CFP).
 
-Спека: docs/services/ingestion.md (этап M3)
+Pitch 2.0: pitch_url / how_to / example_topics / contact_hint → meta + CTA.
+Спека: docs/services/pitch.md, docs/services/ingestion.md (M3).
 """
 
 from __future__ import annotations
@@ -75,17 +76,41 @@ def _parse_deadline(raw: Any) -> datetime | None:
         return None
 
 
+def _str_list(raw: Any) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    return [str(x).strip() for x in raw if x and str(x).strip()]
+
+
+def _clean_url(raw: Any) -> str | None:
+    if not raw or not isinstance(raw, str):
+        return None
+    url = raw.strip()
+    return url or None
+
+
+def is_actionable_place(place: dict[str, Any]) -> bool:
+    """Есть следующий шаг: форма/tips URL или явная инструкция how_to."""
+    if is_actionable_cfp_url(place.get("cfp_url"), homepage=place.get("url")):
+        return True
+    pitch = _clean_url(place.get("pitch_url"))
+    if pitch and is_actionable_cfp_url(pitch, homepage=place.get("url")):
+        return True
+    how_to = (place.get("how_to") or "").strip()
+    return len(how_to) >= 40
+
+
 def place_to_draft(place: dict[str, Any], *, live: dict[str, Any] | None = None) -> OpportunityDraft:
     kind = place.get("kind") or "media"
     how = place.get("how") or "expert_comment"
-    topics = place.get("topics") or []
-    topics_s = ", ".join(topics) if topics else "—"
+    topics = _str_list(place.get("topics"))
+    example_topics = _str_list(place.get("example_topics"))
+    how_to = (place.get("how_to") or "").strip() or None
+    contact_hint = (place.get("contact_hint") or "").strip() or None
     how_s = _HOW_LABEL.get(how, how)
     kind_s = _KIND_LABEL.get(kind, kind)
 
     status = (live or {}).get("status") or place.get("status") or "open"
-    # Дедлайн только реальный: live CFP или явная дата из seed.
-    # Оценочные (deadline_estimated) даты — это догадки, их не показываем как факт.
     seed_deadline = (
         None if place.get("deadline_estimated") else _parse_deadline(place.get("deadline"))
     )
@@ -105,22 +130,38 @@ def place_to_draft(place: dict[str, Any], *, live: dict[str, Any] | None = None)
     if live and live.get("note"):
         live_note = f"\nСтатус CFP: {live['note']}"
 
-    description = (
-        f"Площадка: {kind_s}. Формат: {how_s}. Статус: {status}.\n"
-        f"Темы, которые сюда заходят: {topics_s}."
-        f"{event_note}{live_note}\n"
-        f"Действие: "
-        + (
-            "подать заявку спикера / следить за следующим CFP."
-            if how == "cfp_talk"
-            else "подготовить питч в редакцию / продюсеру."
-        )
-    )
+    topics_s = ", ".join(topics) if topics else "—"
+    examples_s = ", ".join(example_topics) if example_topics else ""
+
+    lines = [
+        f"Площадка: {kind_s}. Формат: {how_s}. Статус: {status}.",
+        f"Темы, которые сюда заходят: {topics_s}.",
+    ]
+    if examples_s:
+        lines.append(f"Примеры углов: {examples_s}.")
+    if how_to:
+        lines.append(f"Как зайти: {how_to}")
+    if contact_hint:
+        lines.append(f"Контакт: {contact_hint}")
+    if event_note:
+        lines.append(event_note.strip())
+    if live_note:
+        lines.append(live_note.strip())
+    if how == "cfp_talk" and not how_to:
+        lines.append("Действие: подать заявку спикера / следить за следующим CFP.")
+    description = "\n".join(lines)
 
     raw_cfp = place.get("cfp_url")
-    # Корень сайта не считаем страницей заявки (иначе «Открыть страницу заявки» врёт).
     cfp_url = raw_cfp if is_actionable_cfp_url(raw_cfp, homepage=place.get("url")) else None
-    url = cfp_url or place.get("url")
+    raw_pitch = _clean_url(place.get("pitch_url"))
+    pitch_url = (
+        raw_pitch
+        if raw_pitch and is_actionable_cfp_url(raw_pitch, homepage=place.get("url"))
+        else None
+    )
+    url = cfp_url or pitch_url or place.get("url")
+    actionable = is_actionable_place(place) or bool(cfp_url)
+
     return OpportunityDraft(
         type="talk",
         title=f"{place['name']} — {how_s}",
@@ -139,7 +180,12 @@ def place_to_draft(place: dict[str, Any], *, live: dict[str, Any] | None = None)
             "how": how,
             "status": status,
             "topics": list(topics),
+            "example_topics": example_topics,
+            "how_to": how_to,
+            "contact_hint": contact_hint,
             "cfp_url": cfp_url,
+            "pitch_url": pitch_url,
+            "actionable": actionable,
             "estimated_deadline": bool(place.get("deadline_estimated")),
         },
     )
@@ -169,7 +215,11 @@ class TalkPlacesConnector:
             if self.live_cfp and cfp_url and place.get("how") == "cfp_talk":
                 snap = await fetch_cfp_page(cfp_url)
                 if snap.raw_ok:
-                    status = "open" if snap.open is True else ("closed" if snap.open is False else "unknown")
+                    status = (
+                        "open"
+                        if snap.open is True
+                        else ("closed" if snap.open is False else "unknown")
+                    )
                     live_meta = {
                         "status": status,
                         "deadline": snap.deadline or _parse_deadline(place.get("deadline")),

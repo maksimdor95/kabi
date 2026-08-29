@@ -21,6 +21,7 @@ _LEADING_JUNK_RE = re.compile(r"^(?:\.{2,}|…|\s)+")
 
 SNIPPET_LIMIT = 220
 REASON_LIMIT = 220
+REASON_LIMIT_PITCH = 480  # Pitch 2.0: 2–3 предложения, не обрезать до полуфразы
 
 
 def format_salary(salary: dict | None) -> str | None:
@@ -73,6 +74,29 @@ def reason_snippet(text: str | None, *, limit: int = REASON_LIMIT) -> str | None
     return ellipsis_cut(clean, limit=limit)
 
 
+def card_approach(item: DigestItem) -> str | None:
+    """Блок «Как зайти» для talk/pitch (Pitch 2.0)."""
+    if item.opp_type != "talk":
+        return None
+    if item.approach and len(item.approach.strip()) >= 20:
+        return ellipsis_cut(item.approach.strip(), limit=520)
+    # Fallback: вытащить из description строку после «Как зайти:»
+    raw = item.description or ""
+    for line in raw.splitlines():
+        low = line.strip().lower()
+        if low.startswith("как зайти:"):
+            body = line.split(":", 1)[-1].strip()
+            if len(body) >= 20:
+                return ellipsis_cut(body, limit=520)
+    return None
+
+
+def card_reason(item: DigestItem) -> str | None:
+    """«Почему ты» с разным лимитом для job / talk."""
+    limit = REASON_LIMIT_PITCH if item.opp_type == "talk" else REASON_LIMIT
+    return reason_snippet(item.reason, limit=limit)
+
+
 def card_title(item: DigestItem) -> tuple[str, str | None]:
     """Заголовок и работодатель после нормализации (для job — чистим мусор в title)."""
     org = item.org
@@ -84,15 +108,16 @@ def card_title(item: DigestItem) -> tuple[str, str | None]:
 
 
 def card_summary(item: DigestItem, *, title: str | None = None) -> str | None:
-    """«Суть» карточки: чистое описание, а если его нет — вытяжка из title."""
+    """«Суть» для job; для talk «Суть» не используем — есть card_approach."""
+    if item.opp_type == "talk":
+        return None
     raw = item.description
-    if item.opp_type != "talk":
-        headline = title or card_title(item)[0]
-        raw = clean_job_description(raw, title=headline) or raw
-        if not raw or len(raw.strip()) < 40:
-            from_title = clean_job_description(item.title, title=headline)
-            if from_title and len(from_title) >= 40:
-                raw = from_title
+    headline = title or card_title(item)[0]
+    raw = clean_job_description(raw, title=headline) or raw
+    if not raw or len(raw.strip()) < 40:
+        from_title = clean_job_description(item.title, title=headline)
+        if from_title and len(from_title) >= 40:
+            raw = from_title
     return snippet(raw)
 
 

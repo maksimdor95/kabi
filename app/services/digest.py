@@ -11,9 +11,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Match, Opportunity, Profile
@@ -44,20 +44,33 @@ class DigestItem:
     deadline: datetime | None = None
     link_label: str | None = None
     description: str | None = None
+    # Pitch 2.0 — витрина СМИ/подкастов
+    approach: str | None = None  # «Как зайти»
+    how: str | None = None
+    kind: str | None = None
+    actionable: bool = True
+    hide_url: bool = False  # homepage без tips — не светим как CTA
 
 
-def _talk_link_label(opp: Opportunity) -> str:
-    """Честная подпись ссылки: не выдаём главную страницу за форму заявки."""
+def _talk_link_label(opp: Opportunity) -> str | None:
+    """Честная подпись ссылки. Homepage без tips/формы → None (скрываем CTA-ссылку)."""
     if (opp.type or "job") != "talk":
         return "Открыть вакансию →"
-    meta = opp.meta or {}
-    cfp = meta.get("cfp_url") if isinstance(meta, dict) else None
+    meta = opp.meta if isinstance(opp.meta, dict) else {}
+    cfp = meta.get("cfp_url")
+    pitch = meta.get("pitch_url")
     if is_actionable_cfp_url(cfp):
         return "Открыть страницу заявки →"
-    return "Открыть сайт →"
+    if is_actionable_cfp_url(pitch):
+        return "Как подать / tips →"
+    return None
 
 
 def _fmt_item(match: Match, opp: Opportunity) -> DigestItem:
+    meta = opp.meta if isinstance(opp.meta, dict) else {}
+    how_to = meta.get("how_to") if isinstance(meta.get("how_to"), str) else None
+    link_label = _talk_link_label(opp)
+    hide_url = (opp.type or "job") == "talk" and link_label is None
     return DigestItem(
         match_id=str(match.id),
         score=match.score,
@@ -67,12 +80,17 @@ def _fmt_item(match: Match, opp: Opportunity) -> DigestItem:
         location=opp.location,
         remote=opp.remote,
         salary=opp.salary,
-        url=opp.url,
+        url=None if hide_url else opp.url,
         source=opp.source,
         opp_type=opp.type or "job",
         deadline=opp.deadline,
-        link_label=_talk_link_label(opp),
+        link_label=link_label,
         description=opp.description,
+        approach=(how_to.strip() if how_to and how_to.strip() else None),
+        how=str(meta["how"]) if meta.get("how") else None,
+        kind=str(meta["kind"]) if meta.get("kind") else None,
+        actionable=bool(meta.get("actionable", True)),
+        hide_url=hide_url,
     )
 
 
@@ -113,6 +131,30 @@ async def list_pending(
         if len(items) >= limit:
             break
     return items
+
+
+async def mark_shown(session: AsyncSession, match_ids: list[str]) -> int:
+    """Пометить карточки доставленными (Pitch 2.0 / anti-spam)."""
+    if not match_ids:
+        return 0
+    ids: list = []
+    for raw in match_ids:
+        try:
+            import uuid as _uuid
+
+            ids.append(_uuid.UUID(str(raw)))
+        except ValueError:
+            continue
+    if not ids:
+        return 0
+    now = datetime.now(timezone.utc)
+    result = await session.execute(
+        update(Match)
+        .where(Match.id.in_(ids), Match.shown_at.is_(None))
+        .values(shown_at=now)
+    )
+    rowcount = getattr(result, "rowcount", None)
+    return int(rowcount or 0)
 
 
 async def build_digest(
