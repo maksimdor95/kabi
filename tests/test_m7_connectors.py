@@ -3,6 +3,7 @@
 from app.ingestion.jobs.career_sites_connector import load_career_config, parse_html_list
 from app.ingestion.jobs.getmatch_connector import (
     enrich_from_vacancy_html,
+    oldest_post_id,
     parse_getmatch_channel,
 )
 from app.ingestion.jobs.habr_connector import parse_habr_html, parse_habr_rss
@@ -27,15 +28,27 @@ _FIXTURE_TG = """
 
 _FIXTURE_GETMATCH = """
 <div class="tgme_widget_message_wrap">
+  <div class="tgme_widget_message text_not_supported_wrap js-widget_message" data-post="g_jobchannel/690">
   <div class="tgme_widget_message_text js-message_text">
     🔶 Head of Product, Avito Локация: #Москва #Удаленка
     <a href="https://getmatch.ru/vacancies/35399">Откликнуться</a>
+  </div>
   </div>
 </div>
 <div class="tgme_widget_message_wrap">
   <div class="tgme_widget_message_text js-message_text">
     🔶 Курьер Сбер Локация: #Москва
     <a href="https://getmatch.ru/vacancies/111">Откликнуться</a>
+  </div>
+</div>
+"""
+
+_FIXTURE_GETMATCH_SLUG_QUERY = """
+<div class="tgme_widget_message_wrap">
+  <div class="tgme_widget_message_text js-message_text">
+    🔶 CPO / Head of Product, Acme Локация: #Удаленка
+    <a href="https://getmatch.ru/vacancies/24202-vedushchii-product?s=community">Отклик</a>
+    <a href="https://getmatch.ru/vacancies/99901?s=commumity">ещё</a>
   </div>
 </div>
 """
@@ -272,8 +285,15 @@ def test_parse_alfa_wb_sber_mts_payloads():
         assert alfa[0].external_id == "36532"
         assert "alfabank" in (alfa[0].url or "")
 
-        # WB
-        wb_client = FakeClient(
+        # WB — шлёт браузерный UA (Kabi UA → 403 на career.rwb.ru)
+        wb_headers_seen: list[dict] = []
+
+        class WbClient(FakeClient):
+            async def get(self, url, params=None, headers=None):
+                wb_headers_seen.append(dict(headers or {}))
+                return await super().get(url, params=params, headers=headers)
+
+        wb_client = WbClient(
             lambda url, p: {
                 "data": {
                     "items": [
@@ -283,7 +303,13 @@ def test_parse_alfa_wb_sber_mts_payloads():
                             "city_title": "Москва",
                             "direction_title": "Product",
                             "employment_types": [{"title": "Удалённо"}],
-                        }
+                        },
+                        {
+                            "id": 100,
+                            "name": "пекарь-тандырщик",
+                            "city_title": "Москва",
+                            "direction_title": "Производство питания",
+                        },
                     ]
                 }
             }
@@ -292,6 +318,8 @@ def test_parse_alfa_wb_sber_mts_payloads():
         assert len(wb) == 1
         assert wb[0].source == "career_wb"
         assert wb[0].remote is True
+        assert wb_headers_seen and "Mozilla" in wb_headers_seen[0].get("User-Agent", "")
+        assert wb_headers_seen[0].get("Referer", "").startswith("https://career.rwb.ru")
 
         # Sber
         sber_client = FakeClient(
@@ -349,6 +377,33 @@ def test_getmatch_keeps_product_drops_courier():
     assert drafts[0].external_id == "35399"
     assert "Head of Product" in drafts[0].title
     assert drafts[0].remote is True
+    assert oldest_post_id(_FIXTURE_GETMATCH) == 690
+
+
+def test_getmatch_parses_slug_and_query_urls():
+    drafts = parse_getmatch_channel(
+        _FIXTURE_GETMATCH_SLUG_QUERY,
+        relevance=["product", "cpo", "head of"],
+    )
+    ids = {d.external_id for d in drafts}
+    assert ids == {"24202", "99901"}
+    assert all(d.url and "?s=" not in d.url for d in drafts)
+
+
+def test_getmatch_seen_dedupes_across_pages():
+    seen: set[str] = set()
+    first = parse_getmatch_channel(
+        _FIXTURE_GETMATCH,
+        relevance=["product", "head of"],
+        seen=seen,
+    )
+    second = parse_getmatch_channel(
+        _FIXTURE_GETMATCH,
+        relevance=["product", "head of"],
+        seen=seen,
+    )
+    assert len(first) == 1
+    assert second == []
 
 
 def test_getmatch_enrich_title():
@@ -365,6 +420,30 @@ def test_getmatch_enrich_title():
     enrich_from_vacancy_html(html, d)
     assert d.title == "Head of Product"
     assert d.org == "Avito"
+
+
+def test_getmatch_title_filter_drops_eng_digest_false_positive():
+    """Канальный текст про «отдельный продукт» не должен оставлять Python после enrich."""
+    from app.ingestion.schemas import OpportunityDraft
+    from app.ingestion.jobs.getmatch_connector import _relevant
+
+    relevance = ["product", "продукт", "продакт", "cpo", "head of"]
+    eng = OpportunityDraft(
+        type="job",
+        title="Fast Track для Python‑разработчиков",
+        org="Т-Банк",
+        source="getmatch.ru",
+        external_id="1",
+    )
+    hop = OpportunityDraft(
+        type="job",
+        title="Head of Product",
+        org="Avito",
+        source="getmatch.ru",
+        external_id="2",
+    )
+    assert not _relevant(f"{eng.title} {eng.org}", relevance)
+    assert _relevant(f"{hop.title} {hop.org}", relevance)
 
 
 def test_habr_rss_and_html():

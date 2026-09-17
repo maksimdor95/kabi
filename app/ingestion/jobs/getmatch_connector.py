@@ -22,10 +22,12 @@ logger = get_logger("kabi.ingestion.getmatch")
 
 _UA = "KabiCareerManager/0.1 (personal; +https://t.me/YouUkabi_bot)"
 _TG_URL = "https://t.me/s/g_jobchannel"
+# numeric id; optional slug suffix; query (?s=community) ignored by findall group
 _VAC_RE = re.compile(
-    r"https?://(?:www\.)?getmatch\.ru/vacancies/(\d+)",
+    r"https?://(?:www\.)?getmatch\.ru/vacancies/(\d+)(?:-[^\s\"'<>?#]*)?",
     re.I,
 )
+_POST_ID_RE = re.compile(r'data-post="g_jobchannel/(\d+)"', re.I)
 _MSG_SPLIT = "tgme_widget_message_wrap"
 _TEXT_RE = re.compile(
     r'class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>',
@@ -34,6 +36,13 @@ _TEXT_RE = re.compile(
 _TAG_RE = re.compile(r"<[^>]+>")
 _TITLE_TAG_RE = re.compile(r"<title[^>]*>([^<]+)</title>", re.I)
 _JSON_TITLE_RE = re.compile(r'"title"\s*:\s*"([^"\\]{5,160})"')
+
+# Сколько страниц t.me/s/?before= листать: первая страница часто сплошные
+# ивенты/ODO без product-ролей; релевантное + ложные «продукт» в маркетинге — глубже.
+_TG_PAGES = 10
+# Обогащаем все кандидаты до лимита — иначе multi-vacancy дайджест
+# оставляет Python/QA из поста, где в тексте мелькнуло слово «продукт».
+_ENRICH_MAX = 40
 
 
 def _strip_html(raw: str) -> str:
@@ -80,10 +89,11 @@ def parse_getmatch_channel(
     *,
     relevance: list[str],
     limit: int = 40,
+    seen: set[str] | None = None,
 ) -> list[OpportunityDraft]:
     """Сообщения канала → черновики со ссылкой getmatch.ru/vacancies/{id}."""
     drafts: list[OpportunityDraft] = []
-    seen: set[str] = set()
+    seen = seen if seen is not None else set()
     for block in html.split(_MSG_SPLIT)[1:]:
         if len(drafts) >= limit:
             break
@@ -120,6 +130,12 @@ def parse_getmatch_channel(
     return drafts
 
 
+def oldest_post_id(html: str) -> int | None:
+    """Минимальный data-post id на странице — курсор для ?before=."""
+    ids = [int(x) for x in _POST_ID_RE.findall(html)]
+    return min(ids) if ids else None
+
+
 def enrich_from_vacancy_html(html: str, draft: OpportunityDraft) -> OpportunityDraft:
     """Подтянуть title/org со страницы вакансии (best-effort)."""
     title = None
@@ -139,7 +155,9 @@ def enrich_from_vacancy_html(html: str, draft: OpportunityDraft) -> OpportunityD
         jm = _JSON_TITLE_RE.search(html)
         if jm:
             title = jm.group(1)[:200]
-    if title and (not draft.title or draft.title.startswith("🔶") or len(draft.title) > 120):
+    if title:
+        # Страница вакансии — источник истины; TG-дайджест часто общий на N ссылок
+        # (☄️ Fast Track / Weekend Offer) и не начинается с 🔶.
         draft.title = title
     return draft
 
@@ -147,9 +165,16 @@ def enrich_from_vacancy_html(html: str, draft: OpportunityDraft) -> OpportunityD
 class GetmatchConnector:
     source = "getmatch.ru"
 
-    def __init__(self, *, enrich: bool = True, limit: int = 40) -> None:
+    def __init__(
+        self,
+        *,
+        enrich: bool = True,
+        limit: int = 40,
+        tg_pages: int = _TG_PAGES,
+    ) -> None:
         self.enrich = enrich
         self.limit = limit
+        self.tg_pages = max(1, tg_pages)
 
     async def fetch(
         self, keywords: list[str], *, area: int | None = None
@@ -171,31 +196,74 @@ class GetmatchConnector:
                 relevance.append(extra)
 
         proxy = tg_http_proxy()
+        timeout = (
+            httpx.Timeout(35.0, connect=12.0)
+            if proxy
+            else httpx.Timeout(20.0, connect=8.0)
+        )
+        drafts: list[OpportunityDraft] = []
+        seen: set[str] = set()
+        vac_links_seen = 0
+        pages_ok = 0
         async with httpx.AsyncClient(
-            timeout=35.0,
+            timeout=timeout,
             headers={"User-Agent": _UA, "Accept-Language": "ru,en;q=0.8"},
             follow_redirects=True,
             proxy=proxy,
         ) as client:
-            try:
-                resp = await client.get(_TG_URL)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("getmatch tg fetch failed: %s", exc)
-                return []
-            if resp.status_code != 200:
-                logger.warning("getmatch tg → HTTP %s", resp.status_code)
-                return []
-            drafts = parse_getmatch_channel(
-                resp.text, relevance=relevance, limit=self.limit
-            )
+            url = _TG_URL
+            before_seen: set[int] = set()
+            for _page in range(self.tg_pages):
+                if len(drafts) >= self.limit:
+                    break
+                try:
+                    resp = await client.get(url)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("getmatch tg fetch failed: %s", exc)
+                    break
+                if resp.status_code != 200:
+                    logger.warning("getmatch tg → HTTP %s", resp.status_code)
+                    break
+                pages_ok += 1
+                vac_links_seen += len(_VAC_RE.findall(resp.text))
+                page_drafts = parse_getmatch_channel(
+                    resp.text,
+                    relevance=relevance,
+                    limit=self.limit - len(drafts),
+                    seen=seen,
+                )
+                drafts.extend(page_drafts)
+                oldest = oldest_post_id(resp.text)
+                if oldest is None or oldest in before_seen:
+                    break
+                before_seen.add(oldest)
+                url = f"{_TG_URL}?before={oldest}"
+
             if self.enrich and drafts:
-                # обогащаем первые N — не долбим сайт
-                for d in drafts[:8]:
+                for d in drafts[: min(len(drafts), _ENRICH_MAX)]:
                     try:
                         page = await client.get(d.url or "")
                         if page.status_code == 200:
                             enrich_from_vacancy_html(page.text, d)
                     except Exception as exc:  # noqa: BLE001
                         logger.debug("getmatch enrich %s: %s", d.external_id, exc)
-            logger.info("getmatch: %d drafts", len(drafts))
+
+            # Пост-фильтр по title/org: каналный текст часто содержит «продукт»
+            # в описании компании («влиять на отдельный продукт»), а ссылки —
+            # на Python/QA. После enrich оставляем только релевантные роли.
+            before_title_filter = len(drafts)
+            drafts = [
+                d
+                for d in drafts
+                if _relevant(f"{d.title or ''} {d.org or ''}", relevance)
+            ][: self.limit]
+            logger.info(
+                "getmatch: %d drafts (pages=%d vac_links≈%d "
+                "channel_hits=%d after_title_filter=%d)",
+                len(drafts),
+                pages_ok,
+                vac_links_seen,
+                before_title_filter,
+                len(drafts),
+            )
             return drafts

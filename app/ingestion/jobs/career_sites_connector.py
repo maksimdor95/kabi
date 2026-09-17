@@ -26,6 +26,12 @@ logger = get_logger("kabi.ingestion.career_sites")
 
 _SITES_PATH = Path(__file__).resolve().parents[3] / "data" / "career_sites.yaml"
 _UA = "KabiCareerManager/0.1 (personal; +https://t.me/YouUkabi_bot)"
+# career.rwb.ru / career.wb.ru режут небраузерный UA (HTTP 403).
+_WB_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/122.0.0.0 Safari/537.36"
+)
 _HREF_RE = re.compile(
     r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
     re.S | re.I,
@@ -230,7 +236,11 @@ async def _fetch_wb(
     site: dict[str, Any],
     relevance: list[str],
 ) -> list[OpportunityDraft]:
-    """career.rwb.ru CRM public vacancies."""
+    """career.rwb.ru / career.wb.ru CRM public vacancies.
+
+    API отвечает 403 на кастомный User-Agent; нужен браузерный UA + Referer
+    на тот же origin (без Origin: career.wildberries.ru — тоже 403).
+    """
     base = str(site.get("api_base") or "https://career.rwb.ru")
     list_url = str(
         site.get("list_url") or f"{base}/crm-api/api/v1/pub/vacancies"
@@ -238,6 +248,12 @@ async def _fetch_wb(
     drafts: list[OpportunityDraft] = []
     seen: set[str] = set()
     queries = relevance[:5] or [""]
+    wb_headers = {
+        "User-Agent": _WB_UA,
+        "Accept": "application/json",
+        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+        "Referer": f"{base}/",
+    }
 
     for title_q in queries:
         if len(drafts) >= _MAX_PER_SITE:
@@ -248,7 +264,7 @@ async def _fetch_wb(
         resp = await client.get(
             list_url,
             params=params,
-            headers={"Accept": "application/json", "Referer": f"{base}/"},
+            headers=wb_headers,
         )
         if resp.status_code != 200:
             logger.warning("wb api → HTTP %s", resp.status_code)
@@ -261,6 +277,18 @@ async def _fetch_wb(
             title = str(item.get("name") or "").strip()
             vid = item.get("id")
             if not title or vid is None:
+                continue
+            blob = " ".join(
+                str(x)
+                for x in (
+                    title,
+                    item.get("direction_role_title"),
+                    item.get("direction_title"),
+                )
+                if x
+            )
+            # title= на API — эвристика; клиентский фильтр ловит шум
+            if relevance and not _relevant(blob, relevance):
                 continue
             url = f"{base}/vacancies/{vid}"
             if url in seen:

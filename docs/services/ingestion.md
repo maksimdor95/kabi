@@ -44,7 +44,11 @@ class JobConnector(Protocol):
 - **Хабр:** официальный API плохо стыкуется с proactive cache — HTML/RSS
   осознанный ToS-риск (зафиксировано продуктом).
 - **Getmatch:** веб-API за логином / SPA без SSR → публичный канал
-  `t.me/s/g_jobchannel` + обогащение страницы вакансии.
+  `t.me/s/g_jobchannel` + обогащение страницы вакансии. Листаем до ~10
+  страниц `?before=` — первая страница часто ивенты/ODO без product-ролей.
+  URL вида `/vacancies/{id}-slug?s=community` нормализуем до numeric id.
+  После enrich — повторный фильтр по title/org (иначе дайджест с фразой
+  «отдельный продукт» тянет Python/QA).
 - **TG:** публичные каналы через `t.me/s/` без админ-прав.
   Короткий HTTP timeout (~8s): с части облаков `t.me` висит долго.
 - **Runner jobs:** сохранение после **каждого** коннектора — медленный scrape
@@ -80,7 +84,7 @@ class JobConnector(Protocol):
 | Яндекс | `yandex_api` | `career_yandex` | ✅ |
 | Сбер | `sber_api` | `career_sber` | ✅ (волна A / Leo) |
 | Альфа-Банк | `alfa_api` | `career_alfa` | ✅ (волна A / Leo) |
-| Wildberries | `wb_api` | `career_wb` | ✅ (волна A / Leo) |
+| Wildberries | `wb_api` | `career_wb` | ✅ (браузерный UA; Kabi UA → 403) |
 | МТС | `mts_api` | `career_mts` | ✅ (волна A / Leo) |
 | Авито | `html_list` | `career_avito` | ✅ |
 | VK | `html_list` | `career_vk` | ✅ |
@@ -130,6 +134,11 @@ internal API, боты/скрипты, scraping.
 
 - Ozon — после antibot.
 - Getmatch: публичный search API вместо TG-прокси, если откроют.
+  Пока канал `g_jobchannel` — пагинация `?before=`; SPA search без SSR ids.
+- **Wildberries (`career.rwb.ru` / `career.wb.ru`):** публичный CRM API жив,
+  но режет небраузерный `User-Agent` (HTTP 403). Коннектор шлёт Chrome UA +
+  `Referer` на тот же origin. `career.wildberries.ru` DNS нет; не путать.
+  `Origin: career.wildberries.ru` тоже даёт 403.
 - **Hirify.me** — без публичного API (ToS запрещает scrape); путь: партнёрский
   фид или опора на наш TG-каталог после прокси. Не путать с каналом `HRity`.
 - Следующие борды (не в коде): Работа.ру, Zarplata.ru, Wellfound / LinkedIn (с оговорками ToS).
@@ -147,3 +156,4 @@ internal API, боты/скрипты, scraping.
 **M7a–e в коде** и в `default_job_connectors()` (Geekjob = M7e).
 Волна A career JSON (Alfa/WB/Sber/MTS) — `362aed5`, на стенде.
 Т-Банк: IT SSR + расширенный `path_regex` (не только `/service/`).
+Getmatch: пагинация `g_jobchannel` (?before=). WB: браузерный UA против 403.
