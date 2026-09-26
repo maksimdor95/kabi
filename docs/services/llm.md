@@ -60,14 +60,20 @@ async def embed(text, *, kind="doc"|"query") -> list[float]: ...
 - Ключи только из env.
 - Учёт и лимиты токенов/стоимости; кэш эмбеддингов ради OpEx.
 - Промпты версионируются и ревьюятся как код (часть харнесса).
+- **Rate limit (Yandex free-tier):** глобальные семафоры в клиенте
+  (chat ≤3, embed ≤2) + exponential backoff на HTTP 429 / quota.
+  Иначе refresh Mini App / ingest валит embeddings и explanations.
 
 ## 9. Тесты / evals
 - **Тест:** роутинг выбирает нужный tier по типу задачи.
 - **Тест:** кэш эмбеддингов не запрашивает повторно одинаковый текст.
+- **Тест:** `_post` ретраит 429 и не ретраит прочие 4xx.
 
 ## 10. Открытые вопросы
 - ~~Провайдер/модель эмбеддингов~~ — решено: Yandex `text-search-doc`/`text-search-query`, dim=256.
 - Суточный лимит токенов/бюджет для контроля OpEx.
+- Поднять квоту в Yandex Cloud (sessions / embed RPS), если users > 1–2
+  одновременно.
 
 ## 11. Статус
 инфра + клиент (`complete` / `complete_messages` / `embed`); M9 использует multi-turn.

@@ -31,7 +31,9 @@ from app.observability.logging import get_logger
 
 logger = get_logger("kabi.ingestion.runner")
 
-_EMBED_CONCURRENCY = 8
+# Параллелизм эмбеддингов: глобальный лимит ещё в llm.client (_EMBED_CONCURRENCY=2).
+# Здесь не разгоняем пачку выше — иначе 429 на free-tier Yandex (~10 RPS).
+_EMBED_CONCURRENCY = 2
 
 
 @dataclass

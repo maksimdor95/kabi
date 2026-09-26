@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any, Literal
 
@@ -22,7 +23,16 @@ EmbedKind = Literal["doc", "query"]
 # 256-мерные эмбеддинги Yandex text-search-*
 EMBED_DIM = 256
 
+# Free-tier Yandex: ~10 concurrent sessions / ~10 embed RPS.
+# Держим ниже квоты, иначе 429 на refresh Mini App / ingest.
+_CHAT_CONCURRENCY = 3
+_EMBED_CONCURRENCY = 2
+_POST_MAX_ATTEMPTS = 5
+_POST_RETRY_BASE_SEC = 0.6
+
 _embed_cache: dict[tuple[str, str], list[float]] = {}
+_chat_sem = asyncio.Semaphore(_CHAT_CONCURRENCY)
+_embed_sem = asyncio.Semaphore(_EMBED_CONCURRENCY)
 
 
 class LLMError(RuntimeError):
@@ -48,13 +58,52 @@ def _model_for_tier(tier: Tier) -> str:
     return model
 
 
+def _is_rate_limited(status_code: int, body: str) -> bool:
+    if status_code == 429:
+        return True
+    low = body.lower()
+    return status_code == 400 and (
+        "rate_limit" in low or "quota" in low or "limit exceed" in low
+    )
+
+
 async def _post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """POST с ретраем на 429/quota и семафором по типу endpoint."""
     url = f"{settings.llm_base_url.rstrip('/')}/{path.lstrip('/')}"
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(url, headers=_headers(), json=payload)
-    if resp.status_code != 200:
-        raise LLMError(f"{path} → HTTP {resp.status_code}: {resp.text[:500]}")
-    return resp.json()
+    sem = _embed_sem if path.lstrip("/").startswith("embeddings") else _chat_sem
+    last_err: LLMError | None = None
+
+    async with sem:
+        for attempt in range(1, _POST_MAX_ATTEMPTS + 1):
+            try:
+                async with httpx.AsyncClient(timeout=60) as client:
+                    resp = await client.post(url, headers=_headers(), json=payload)
+            except httpx.HTTPError as exc:
+                last_err = LLMError(f"{path} → network: {exc}")
+                if attempt >= _POST_MAX_ATTEMPTS:
+                    raise last_err from exc
+                await asyncio.sleep(_POST_RETRY_BASE_SEC * (2 ** (attempt - 1)))
+                continue
+
+            if resp.status_code == 200:
+                return resp.json()
+
+            body = resp.text[:500]
+            if _is_rate_limited(resp.status_code, body) and attempt < _POST_MAX_ATTEMPTS:
+                delay = _POST_RETRY_BASE_SEC * (2 ** (attempt - 1))
+                logger.warning(
+                    "llm_rate_limited path=%s attempt=%s/%s sleep=%.1fs",
+                    path,
+                    attempt,
+                    _POST_MAX_ATTEMPTS,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+                continue
+
+            raise LLMError(f"{path} → HTTP {resp.status_code}: {body}")
+
+    raise last_err or LLMError(f"{path} → failed after retries")
 
 
 def _track(data: dict[str, Any]) -> None:

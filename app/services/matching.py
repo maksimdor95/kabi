@@ -475,9 +475,15 @@ async def match(
     rank_mode: RankMode = "fresh_relevant",
     max_age_hours: float | None = None,
 ) -> list[Match]:
+    # Длинный ingest в build_digest может пережить /delete: профиль уже нет.
+    alive = await session.get(Profile, profile.id)
+    if alive is None:
+        logger.warning("match skip: profile=%s gone (FK race)", profile.id)
+        return []
+
     candidates = await rank_candidates(
         session,
-        profile,
+        alive,
         limit=limit,
         scope=scope,
         rank_mode=rank_mode,
@@ -486,14 +492,20 @@ async def match(
     if not candidates:
         return []
 
-    # Объяснения параллельно — иначе 7 последовательных LLM ≈ минута+.
+    # Параллель ограничена семафором в llm.client; gather всё равно короче sequential.
     reasons = await asyncio.gather(
-        *(explain(profile, c.opportunity) for c in candidates)
+        *(explain(alive, c.opportunity) for c in candidates)
     )
+
+    # Повторная проверка: между rank и flush профиль могли удалить.
+    if await session.get(Profile, alive.id) is None:
+        logger.warning("match abort: profile=%s deleted before flush", alive.id)
+        return []
+
     created: list[Match] = []
     for cand, reason in zip(candidates, reasons, strict=True):
         m = Match(
-            profile_id=profile.id,
+            profile_id=alive.id,
             opportunity_id=cand.opportunity.id,
             score=cand.score,
             reason=reason,
