@@ -30,6 +30,24 @@ def test_parse_explain_structured():
     assert "· вилки нет" in why
 
 
+def test_parse_explain_strips_meta_labels():
+    from app.services.cards import parse_explain
+
+    _, why = parse_explain(
+        "СУТЬ: запуск digital на зарубежных рынках\n"
+        "ПОЧЕМУ:\n"
+        "· апсайд — влияние на международное направление\n"
+        "· якорь — опыт полного цикла до PMF\n"
+        "· оговорка — вилки в тексте нет"
+    )
+    assert why is not None
+    assert "апсайд" not in why.lower()
+    assert "якорь" not in why.lower()
+    assert "оговорка" not in why.lower()
+    assert "влияние на международное" in why
+    assert "полного цикла до PMF" in why
+
+
 def test_source_labels():
     assert format_source_label("hh.ru") == "HeadHunter"
     assert format_source_label("tg_forproducts") == "Telegram · forproducts"
@@ -63,14 +81,17 @@ def test_format_card_employer_and_snippet_no_source_accent():
     text = format_card(item)
     assert "<b>🏢 Авито</b>" in text
     assert "💰 от 500 000 RUB" in text
-    assert "<blockquote expandable>" in text
-    assert "<b>Суть:</b>" in text
+    # Почему ты — снаружи цитаты
+    why_pos = text.index("<b>Почему ты:</b>")
+    quote_pos = text.index("<blockquote expandable>")
+    assert why_pos < quote_pos
+    assert "<b>Суть:</b>" in text[quote_pos:]
     assert "roadmap и метрики" in text
     assert "Темы:" not in text
     assert "career_site" not in text
-    assert "<b>Почему ты:</b>" in text
     assert "· уровень Head of Product" in text
-    assert "📡" not in text  # источник не акцентируем
+    assert "апсайд" not in text.lower()
+    assert "📡" not in text
 
 
 def test_format_card_legacy_prose_still_works():

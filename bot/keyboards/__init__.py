@@ -17,6 +17,7 @@ from aiogram.types import (
 
 from app.services.cards import (
     card_approach,
+    card_detail,
     card_reason,
     card_summary,
     card_title,
@@ -102,7 +103,7 @@ def menu_for_profile(profile: object | None) -> ReplyKeyboardMarkup:
 
 
 def format_card(item: DigestItem, *, show_source: bool = False) -> str:
-    """Карточка: шапка + expandable-цитата (Суть/Как зайти + Почему ты)."""
+    """Шапка + «Почему ты» снаружи; expandable — Суть/Как зайти + подробнее."""
     is_talk = item.opp_type == "talk"
     badge = "🎤 " if is_talk else ""
     title, org = card_title(item)
@@ -133,6 +134,14 @@ def format_card(item: DigestItem, *, show_source: bool = False) -> str:
     if item.deadline:
         lines.append("⏰ Дедлайн: " + item.deadline.strftime("%d.%m.%Y"))
 
+    # «Почему ты» — голос менеджера, не внутри цитаты
+    reason = card_reason(item)
+    if reason:
+        reason_html = "\n".join(escape(line) for line in reason.splitlines())
+        lines.append("")
+        lines.append(f"<b>Почему ты:</b>\n{reason_html}")
+
+    # Цитата: краткая суть сверху, подробности снизу (▾ раскрывает хвост)
     quote: list[str] = []
     if is_talk:
         approach = card_approach(item)
@@ -142,12 +151,9 @@ def format_card(item: DigestItem, *, show_source: bool = False) -> str:
         summary = card_summary(item, title=title)
         if summary:
             quote.append(f"<b>Суть:</b> {escape(summary)}")
-
-    reason = card_reason(item)
-    if reason:
-        # буллеты многострочные — escape по строкам, переносы сохранить
-        reason_html = "\n".join(escape(line) for line in reason.splitlines())
-        quote.append(f"<b>Почему ты:</b>\n{reason_html}")
+        detail = card_detail(item, title=title)
+        if detail:
+            quote.append(escape(detail))
 
     if quote:
         lines.append("")

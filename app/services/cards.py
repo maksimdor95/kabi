@@ -27,10 +27,16 @@ _WHY_ONLY_RE = re.compile(
     r"(?is)^\s*(?:ПОЧЕМУ(?:\s*ТЫ)?|Почему(?:\s*ты)?)\s*:?\s*(.*)\s*$"
 )
 _BULLET_LINE_RE = re.compile(r"^[\s]*[·•\-\*]\s*(.+)$")
+# LLM иногда копирует мета-ярлыки из промпта — срезаем.
+_META_BULLET_PREFIX_RE = re.compile(
+    r"^(?:апсайд|якорь|оговорка|ход|мост|потолок)\s*[—–\-:]\s*",
+    re.IGNORECASE,
+)
 
 # Fallback-суть из описания — короткая строка; structured essence не режем «…».
 SNIPPET_LIMIT = 140
-ESSENCE_LIMIT = 160
+ESSENCE_LIMIT = 120
+DETAIL_LIMIT = 420  # хвост expandable: подробнее вакансии
 # С expandable-цитатой в Telegram можно держать полный «Почему ты».
 REASON_LIMIT = 520
 REASON_LIMIT_PITCH = 520
@@ -86,7 +92,7 @@ def reason_snippet(text: str | None, *, limit: int = REASON_LIMIT) -> str | None
 
 
 def _norm_bullets(block: str) -> str | None:
-    """Нормализовать буллеты к «· …»; прозу оставить одной строкой."""
+    """Нормализовать буллеты к «· …»; срезать мета-ярлыки; прозу — в буллеты."""
     raw = (block or "").strip()
     if not raw:
         return None
@@ -96,18 +102,12 @@ def _norm_bullets(block: str) -> str | None:
         if not line:
             continue
         m = _BULLET_LINE_RE.match(line)
-        if m:
-            body = m.group(1).strip().rstrip(".")
-            if body:
-                lines.append(f"· {body}")
-        else:
-            # LLM иногда пишет без маркеров — каждый непустой абзац = буллет
-            body = line.rstrip(".")
-            if body:
-                lines.append(f"· {body}")
+        body = m.group(1).strip() if m else line
+        body = _META_BULLET_PREFIX_RE.sub("", body).strip().rstrip(".")
+        if body:
+            lines.append(f"· {body}")
     if not lines:
         return None
-    # не больше 3 буллетов на карточке
     return "\n".join(lines[:3])
 
 
@@ -189,6 +189,36 @@ def card_summary(item: DigestItem, *, title: str | None = None) -> str | None:
         if from_title and len(from_title) >= 40:
             raw = from_title
     return snippet(raw)
+
+
+def card_detail(item: DigestItem, *, title: str | None = None) -> str | None:
+    """Подробнее вакансии для хвоста expandable (не дублирует Суть)."""
+    if item.opp_type == "talk":
+        return None
+    headline = title or card_title(item)[0]
+    raw = item.description
+    raw = clean_job_description(raw, title=headline) or raw
+    if not raw or len(raw.strip()) < 60:
+        from_title = clean_job_description(item.title, title=headline)
+        if from_title and len(from_title) >= 60:
+            raw = from_title
+    if not raw:
+        return None
+    clean = _TOPICS_TAIL_RE.sub("", raw)
+    clean = _TAG_RE.sub(" ", clean)
+    clean = _WS_RE.sub(" ", clean).strip()
+    clean = _LEADING_JUNK_RE.sub("", clean).strip()
+    if len(clean) < 60:
+        return None
+    essence = card_summary(item, title=headline)
+    # не повторять ту же фразу, что уже в Сути
+    if essence and clean.lower().startswith(essence.lower()[:40]):
+        rest = clean[len(essence) :].lstrip(" .,—–-")
+        if len(rest) >= 60:
+            clean = rest
+        else:
+            return None
+    return ellipsis_cut(clean, limit=DETAIL_LIMIT)
 
 
 _SOURCE_LABELS: dict[str, str] = {
