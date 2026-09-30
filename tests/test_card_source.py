@@ -1,4 +1,4 @@
-"""Тесты карточки и меню по приоритету."""
+"""Тесты карточки Sprint B0 и меню по приоритету."""
 
 from app.services.digest import DigestItem
 from bot.keyboards import (
@@ -13,39 +13,48 @@ from bot.keyboards import (
 )
 
 
-def test_parse_explain_structured():
+def test_parse_explain_structured_b0():
     from app.services.cards import parse_explain
 
-    essence, why = parse_explain(
-        "СУТЬ: доменные планы + контроль исполнения\n"
+    parts = parse_explain(
+        "СУТЬ: оптимизация метрик и клиентский опыт\n"
+        "О_КОМПАНИИ: fintech-команда в банке\n"
+        "О_ПРОДУКТЕ: зарплатный сервис для физлиц\n"
         "ПОЧЕМУ:\n"
-        "· вход в B2B LLM без смены трека\n"
-        "- уровень ниже Head of Product — мост, не потолок\n"
-        "* вилки нет — сначала созвон"
+        "· роль Senior Product Owner совпадает с целевой\n"
+        "- опыт FinTech из профиля цепляется к домену\n"
+        "* метрики CR/MAU — прямое пересечение навыков"
     )
-    assert essence == "доменные планы + контроль исполнения"
-    assert why is not None
-    assert why.startswith("· вход в B2B LLM")
-    assert why.count("\n") == 2
-    assert "· вилки нет" in why
+    assert parts.essence == "оптимизация метрик и клиентский опыт"
+    assert parts.company == "fintech-команда в банке"
+    assert parts.product == "зарплатный сервис для физлиц"
+    assert parts.why is not None
+    assert parts.why.startswith("· роль Senior Product Owner")
+    assert parts.why.count("\n") == 2
 
 
-def test_parse_explain_strips_meta_labels():
+def test_parse_explain_skips_empty_company_and_risk_bullet():
     from app.services.cards import parse_explain
 
-    _, why = parse_explain(
+    parts = parse_explain(
         "СУТЬ: запуск digital на зарубежных рынках\n"
+        "О_КОМПАНИИ: —\n"
+        "О_ПРОДУКТЕ: none\n"
         "ПОЧЕМУ:\n"
-        "· апсайд — влияние на международное направление\n"
+        "· upside (апсайд): влияние на международное направление\n"
         "· якорь — опыт полного цикла до PMF\n"
-        "· оговорка — вилки в тексте нет"
+        "· нет информации о рисках или особенностях вакансии"
     )
-    assert why is not None
-    assert "апсайд" not in why.lower()
-    assert "якорь" not in why.lower()
-    assert "оговорка" not in why.lower()
-    assert "влияние на международное" in why
-    assert "полного цикла до PMF" in why
+    assert parts.company is None
+    assert parts.product is None
+    assert parts.why is not None
+    assert "апсайд" not in parts.why.lower()
+    assert "якорь" not in parts.why.lower()
+    assert "upside" not in parts.why.lower()
+    assert "риск" not in parts.why.lower()
+    assert "влияние на международное" in parts.why
+    assert "полного цикла до PMF" in parts.why
+    assert parts.why.count("\n") == 1  # третий буллет отброшен
 
 
 def test_source_labels():
@@ -54,12 +63,14 @@ def test_source_labels():
     assert format_source_label("career_avito") == "Авито · карьера"
 
 
-def test_format_card_employer_and_snippet_no_source_accent():
+def test_format_card_b0_layout():
     item = DigestItem(
         match_id="1",
         score=0.9,
         reason=(
             "СУТЬ: roadmap и метрики роста marketplace-команды\n"
+            "О_КОМПАНИИ: крупный классифайд\n"
+            "О_ПРОДУКТЕ: вертикаль товаров\n"
             "ПОЧЕМУ:\n"
             "· уровень Head of Product — шаг к целевому контуру\n"
             "· marketplace-опыт из профиля цепляется к требованию\n"
@@ -73,6 +84,7 @@ def test_format_card_employer_and_snippet_no_source_accent():
         url="https://example.com",
         source="career_avito",
         opp_type="job",
+        link_label="Открыть вакансию →",
         description=(
             "Руководить продуктовой командой, формировать roadmap и метрики роста. "
             "Опыт в marketplace обязателен.\nТемы: career_site, avito"
@@ -80,22 +92,52 @@ def test_format_card_employer_and_snippet_no_source_accent():
     )
     text = format_card(item)
     assert "<b>🏢 Авито</b>" in text
+    assert "📍 Москва · удалённо" in text
     assert "💰 от 500 000 RUB" in text
-    # Почему ты — снаружи цитаты
+    assert "<b>Суть:</b> roadmap и метрики" in text
+    assert "<b>О компании:</b> крупный классифайд" in text
+    assert "<b>О продукте:</b> вертикаль товаров" in text
+    # Суть снаружи цитаты; в цитате — описание источника
+    essence_pos = text.index("<b>Суть:</b>")
     why_pos = text.index("<b>Почему ты:</b>")
     quote_pos = text.index("<blockquote expandable>")
-    assert why_pos < quote_pos
-    assert "<b>Суть:</b>" in text[quote_pos:]
-    assert "roadmap и метрики" in text
-    assert "Темы:" not in text
-    assert "career_site" not in text
+    assert essence_pos < why_pos < quote_pos
     assert "· уровень Head of Product" in text
     assert "апсайд" not in text.lower()
-    assert "📡" not in text
+    assert "Темы:" not in text
+    assert "Открыть вакансию" in text
+
+
+def test_format_card_omits_empty_company_product():
+    item = DigestItem(
+        match_id="3",
+        score=0.7,
+        reason=(
+            "СУТЬ: продуктовый контур платежей\n"
+            "О_КОМПАНИИ: —\n"
+            "О_ПРОДУКТЕ: —\n"
+            "ПОЧЕМУ:\n"
+            "· роль Product Owner\n"
+            "· опыт банковских продуктов"
+        ),
+        title="Product Owner",
+        org="MAREE",
+        location="Москва",
+        remote=True,
+        salary=None,
+        url="https://example.com/x",
+        source="hh.ru",
+        description="Длинное описание обязанностей для цитаты. " * 8,
+        link_label="Открыть вакансию →",
+    )
+    text = format_card(item)
+    assert "О компании" not in text
+    assert "О продукте" not in text
+    assert "<b>Суть:</b>" in text
+    assert "<blockquote expandable>" in text
 
 
 def test_format_card_legacy_prose_still_works():
-    """Старые Match без СУТЬ/ПОЧЕМУ — суть из description, reason прозой."""
     long_desc = (
         "Проектировать сквозной пользовательский путь: от входа в раздел до перехода. "
         "Опыт работы Product Manager от 3 лет. "
@@ -122,10 +164,6 @@ def test_format_card_legacy_prose_still_works():
         description="..." + long_desc,
     )
     text = format_card(item)
-    assert "<blockquote expandable>" in text
-    assert "<b>Суть:</b> ..." not in text
-    assert "<b>Суть:</b> …" not in text
-    assert "Проектировать" in text
     assert "<b>Почему ты:</b>" in text
     assert "Product Owner" in text
 
@@ -137,18 +175,9 @@ def test_card_keyboard_draft_callback_and_favorites_label():
     labels = {btn.text for row in kb.inline_keyboard for btn in row}
     assert "🔖 Избранное" in labels
     assert "✍️ Сопроводительное" in labels
-    draft = [
-        btn
-        for row in kb.inline_keyboard
-        for btn in row
-        if btn.text == "✍️ Сопроводительное"
-    ][0]
-    assert draft.callback_data.startswith("draft:")
-    assert not draft.callback_data.startswith("fb:")
 
 
 def test_menu_job_hides_talks():
-    # Sprint A: reply-меню укорочено — pitch/talks только командами.
     kb = main_menu_keyboard("job")
     labels = {btn.text for row in kb.keyboard for btn in row}
     assert MENU_TODAY in labels

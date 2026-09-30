@@ -17,7 +17,9 @@ from aiogram.types import (
 
 from app.services.cards import (
     card_approach,
+    card_company,
     card_detail,
+    card_product,
     card_reason,
     card_summary,
     card_title,
@@ -103,7 +105,7 @@ def menu_for_profile(profile: object | None) -> ReplyKeyboardMarkup:
 
 
 def format_card(item: DigestItem, *, show_source: bool = False) -> str:
-    """Шапка + «Почему ты» снаружи; expandable — Суть/Как зайти + подробнее."""
+    """Шапка → Суть/компания/продукт → Почему ты → цитата из источника."""
     is_talk = item.opp_type == "talk"
     badge = "🎤 " if is_talk else ""
     title, org = card_title(item)
@@ -119,10 +121,6 @@ def format_card(item: DigestItem, *, show_source: bool = False) -> str:
         how_s = _HOW_LABEL.get(item.how, item.how)
         lines.append(f"Формат: {escape(str(how_s))}")
 
-    salary = format_salary(item.salary)
-    if salary:
-        lines.append(f"💰 {escape(salary)}")
-
     loc_bits = []
     if item.location:
         loc_bits.append(item.location)
@@ -131,30 +129,43 @@ def format_card(item: DigestItem, *, show_source: bool = False) -> str:
     if loc_bits:
         lines.append("📍 " + " · ".join(escape(b) for b in loc_bits))
 
+    salary = format_salary(item.salary)
+    if salary:
+        lines.append(f"💰 {escape(salary)}")
+
     if item.deadline:
         lines.append("⏰ Дедлайн: " + item.deadline.strftime("%d.%m.%Y"))
 
-    # «Почему ты» — голос менеджера, не внутри цитаты
+    if is_talk:
+        approach = card_approach(item)
+        if approach:
+            lines.append("")
+            lines.append(f"<b>Как зайти:</b> {escape(approach)}")
+    else:
+        summary = card_summary(item, title=title)
+        company = card_company(item)
+        product = card_product(item)
+        if summary or company or product:
+            lines.append("")
+            if summary:
+                lines.append(f"<b>Суть:</b> {escape(summary)}")
+            if company:
+                lines.append(f"<b>О компании:</b> {escape(company)}")
+            if product:
+                lines.append(f"<b>О продукте:</b> {escape(product)}")
+
     reason = card_reason(item)
     if reason:
         reason_html = "\n".join(escape(line) for line in reason.splitlines())
         lines.append("")
         lines.append(f"<b>Почему ты:</b>\n{reason_html}")
 
-    # Цитата: краткая суть сверху, подробности снизу (▾ раскрывает хвост)
+    # Цитата — только описание из источника (▾ раскрывает)
     quote: list[str] = []
-    if is_talk:
-        approach = card_approach(item)
-        if approach:
-            quote.append(f"<b>Как зайти:</b> {escape(approach)}")
-    else:
-        summary = card_summary(item, title=title)
-        if summary:
-            quote.append(f"<b>Суть:</b> {escape(summary)}")
+    if not is_talk:
         detail = card_detail(item, title=title)
         if detail:
             quote.append(escape(detail))
-
     if quote:
         lines.append("")
         lines.append("<blockquote expandable>" + "\n\n".join(quote) + "</blockquote>")

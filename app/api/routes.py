@@ -58,6 +58,8 @@ def _card(item: DigestItem, *, saved: bool = False) -> CardOut:
         score=round(item.score, 4),
         reason=cards.card_reason(item),
         summary=cards.card_summary(item, title=title),
+        company=cards.card_company(item),
+        product=cards.card_product(item),
         approach=cards.card_approach(item),
         how=item.how,
         url=item.url,

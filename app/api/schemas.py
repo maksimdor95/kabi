@@ -54,6 +54,8 @@ class CardOut(BaseModel):
     score: float = 0.0
     reason: str | None = None
     summary: str | None = None
+    company: str | None = None
+    product: str | None = None
     approach: str | None = None  # Pitch 2.0: «Как зайти»
     how: str | None = None
     url: str | None = None

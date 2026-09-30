@@ -1,45 +1,67 @@
 """Поля карточки возможности, общие для бота и Mini App.
 
-Здесь только presentation-neutral данные (строка зарплаты, «суть», «почему ты»,
+Presentation-neutral данные (зарплата, суть, компания/продукт, почему ты,
 подпись источника). Разметка — на стороне канала: HTML в `bot/keyboards`,
-JSON в `app/api`. Спека: docs/services/digest.md, docs/services/miniapp.md.
+JSON в `app/api`. Спека: docs/services/sprint_b.md, digest.md, miniapp.md.
 """
 
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from app.ingestion.normalize_job import clean_job_description, display_title, guess_org_from_title
 from app.services.digest import DigestItem
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
-# Служебный хвост ingestion (старые записи): «Темы: career_site, avito».
 _TOPICS_TAIL_RE = re.compile(r"(?:\n|\s)*Темы\s*:\s*[^\n]*$", re.IGNORECASE)
-# HH/snippet часто начинается с «...» или с середины предложения.
 _LEADING_JUNK_RE = re.compile(r"^(?:\.{2,}|…|\s)+")
 
-# Структурированный explain (см. matching.explain): СУТЬ + ПОЧЕМУ-буллеты.
-_STRUCTURED_EXPLAIN_RE = re.compile(
-    r"(?is)^\s*(?:СУТЬ|Суть)\s*:\s*(.+?)\s*(?:ПОЧЕМУ(?:\s*ТЫ)?|Почему(?:\s*ты)?)\s*:?\s*(.*)\s*$"
-)
-_WHY_ONLY_RE = re.compile(
-    r"(?is)^\s*(?:ПОЧЕМУ(?:\s*ТЫ)?|Почему(?:\s*ты)?)\s*:?\s*(.*)\s*$"
+# Structured explain (Sprint B0): СУТЬ + опц. О_КОМПАНИИ/О_ПРОДУКТЕ + ПОЧЕМУ.
+_FIELD_RE = re.compile(
+    r"(?im)^\s*(СУТЬ|Суть|О_КОМПАНИИ|О компании|О_ПРОДУКТЕ|О продукте|"
+    r"ПОЧЕМУ(?:\s*ТЫ)?|Почему(?:\s*ты)?)\s*:\s*(.*)$"
 )
 _BULLET_LINE_RE = re.compile(r"^[\s]*[·•\-\*]\s*(.+)$")
-# LLM иногда копирует мета-ярлыки из промпта — срезаем.
 _META_BULLET_PREFIX_RE = re.compile(
-    r"^(?:апсайд|якорь|оговорка|ход|мост|потолок)\s*[—–\-:]\s*",
+    r"^(?:"
+    r"(?:upside|anchor|disclaimer|risks?)\s*(?:\([^)]*\))?\s*[—–\-:]\s*"
+    r"|(?:апсайд|якорь|оговорка|ход|мост|потолок|риск)\s*(?:\([^)]*\))?\s*[—–\-:]\s*"
+    r")",
     re.IGNORECASE,
 )
+def _is_empty_signal(text: str) -> bool:
+    t = text.strip().lower().rstrip(".")
+    if t in {"—", "-", "–", "нет", "n/a", "na", "none", ""}:
+        return True
+    junk = (
+        "нет информации о риск",
+        "рисков нет",
+        "риска нет",
+        "оговорок нет",
+        "оговорки нет",
+        "нет оговор",
+        "особенностей вакансии",
+        "особенности вакансии",
+    )
+    return any(j in t for j in junk)
 
-# Fallback-суть из описания — короткая строка; structured essence не режем «…».
 SNIPPET_LIMIT = 140
-ESSENCE_LIMIT = 120
-DETAIL_LIMIT = 420  # хвост expandable: подробнее вакансии
-# С expandable-цитатой в Telegram можно держать полный «Почему ты».
+ESSENCE_LIMIT = 160
+COMPANY_LIMIT = 160
+PRODUCT_LIMIT = 160
+DETAIL_LIMIT = 520
 REASON_LIMIT = 520
 REASON_LIMIT_PITCH = 520
+
+
+@dataclass(frozen=True)
+class ExplainParts:
+    essence: str | None = None
+    company: str | None = None
+    product: str | None = None
+    why: str | None = None
 
 
 def format_salary(salary: dict | None) -> str | None:
@@ -58,7 +80,6 @@ def format_salary(salary: dict | None) -> str | None:
 
 
 def ellipsis_cut(text: str, *, limit: int) -> str:
-    """Обрезать по границе слова и поставить …"""
     text = _WS_RE.sub(" ", text).strip()
     if len(text) <= limit:
         return text
@@ -67,7 +88,6 @@ def ellipsis_cut(text: str, *, limit: int) -> str:
 
 
 def snippet(text: str | None, *, limit: int = SNIPPET_LIMIT) -> str | None:
-    """Короткая выжимка описания (fallback, если нет СУТЬ из explain)."""
     if not text:
         return None
     clean = _TOPICS_TAIL_RE.sub("", text)
@@ -82,7 +102,6 @@ def snippet(text: str | None, *, limit: int = SNIPPET_LIMIT) -> str | None:
 
 
 def reason_snippet(text: str | None, *, limit: int = REASON_LIMIT) -> str | None:
-    """Прозаический «Почему ты» (старые Match без структуры)."""
     if not text:
         return None
     clean = _WS_RE.sub(" ", _TAG_RE.sub(" ", text)).strip()
@@ -91,8 +110,16 @@ def reason_snippet(text: str | None, *, limit: int = REASON_LIMIT) -> str | None
     return ellipsis_cut(clean, limit=limit)
 
 
+def _clean_fact(value: str | None, *, limit: int) -> str | None:
+    if not value:
+        return None
+    text = _WS_RE.sub(" ", value).strip().strip("\"'«»")
+    if not text or _is_empty_signal(text):
+        return None
+    return ellipsis_cut(text, limit=limit)
+
+
 def _norm_bullets(block: str) -> str | None:
-    """Нормализовать буллеты к «· …»; срезать мета-ярлыки; прозу — в буллеты."""
     raw = (block or "").strip()
     if not raw:
         return None
@@ -104,43 +131,74 @@ def _norm_bullets(block: str) -> str | None:
         m = _BULLET_LINE_RE.match(line)
         body = m.group(1).strip() if m else line
         body = _META_BULLET_PREFIX_RE.sub("", body).strip().rstrip(".")
-        if body:
-            lines.append(f"· {body}")
+        body = re.sub(
+            r"^(?:upside|anchor|disclaimer|апсайд|якорь|оговорка)"
+            r"(?:\s*\([^)]*\))?\s*[—–\-:]\s*",
+            "",
+            body,
+            flags=re.I,
+        ).strip()
+        if not body or _is_empty_signal(body):
+            continue
+        lines.append(f"· {body}")
     if not lines:
         return None
     return "\n".join(lines[:3])
 
 
-def parse_explain(reason: str | None) -> tuple[str | None, str | None]:
-    """Разобрать structured explain → (суть, почему_ты_буллеты).
-
-    Формат из matching.explain:
-        СУТЬ: ...
-        ПОЧЕМУ:
-        · ...
-        · ...
-    """
+def parse_explain(reason: str | None) -> ExplainParts:
+    """Разобрать structured explain → суть / компания / продукт / почему."""
     if not reason or not reason.strip():
-        return None, None
+        return ExplainParts()
     text = reason.strip()
-    m = _STRUCTURED_EXPLAIN_RE.match(text)
-    if m:
-        essence = _WS_RE.sub(" ", m.group(1)).strip().rstrip(".")
-        why = _norm_bullets(m.group(2))
-        if essence and len(essence) > ESSENCE_LIMIT:
-            essence = ellipsis_cut(essence, limit=ESSENCE_LIMIT)
-        return (essence or None), why
-    m2 = _WHY_ONLY_RE.match(text)
-    if m2 and ("\n" in text or _BULLET_LINE_RE.search(text)):
-        return None, _norm_bullets(m2.group(1))
-    # уже одни буллеты без заголовка
+
+    fields: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in text.splitlines():
+        m = _FIELD_RE.match(line)
+        if m:
+            label = m.group(1).lower().replace(" ", "_")
+            if label.startswith("суть"):
+                current = "essence"
+            elif "компани" in label:
+                current = "company"
+            elif "продукт" in label:
+                current = "product"
+            elif label.startswith("почему"):
+                current = "why"
+            else:
+                current = None
+            rest = (m.group(2) or "").strip()
+            fields.setdefault(current or "_", [])
+            if current and rest:
+                fields[current].append(rest)
+            continue
+        if current:
+            fields.setdefault(current, []).append(line)
+
+    if "essence" in fields or "why" in fields or "company" in fields:
+        essence = _clean_fact(" ".join(fields.get("essence") or []), limit=ESSENCE_LIMIT)
+        company = _clean_fact(" ".join(fields.get("company") or []), limit=COMPANY_LIMIT)
+        product = _clean_fact(" ".join(fields.get("product") or []), limit=PRODUCT_LIMIT)
+        why = _norm_bullets("\n".join(fields.get("why") or []))
+        return ExplainParts(essence=essence, company=company, product=product, why=why)
+
+    # legacy: СУТЬ:... ПОЧЕМУ:... одним блоком без доп. полей
+    legacy = re.match(
+        r"(?is)^\s*(?:СУТЬ|Суть)\s*:\s*(.+?)\s*(?:ПОЧЕМУ(?:\s*ТЫ)?|Почему(?:\s*ты)?)\s*:?\s*(.*)\s*$",
+        text,
+    )
+    if legacy:
+        return ExplainParts(
+            essence=_clean_fact(legacy.group(1), limit=ESSENCE_LIMIT),
+            why=_norm_bullets(legacy.group(2)),
+        )
     if _BULLET_LINE_RE.search(text) and "\n" in text:
-        return None, _norm_bullets(text)
-    return None, None
+        return ExplainParts(why=_norm_bullets(text))
+    return ExplainParts()
 
 
 def card_approach(item: DigestItem) -> str | None:
-    """Блок «Как зайти» для talk/pitch (Pitch 2.0)."""
     if item.opp_type != "talk":
         return None
     if item.approach and len(item.approach.strip()) >= 20:
@@ -156,16 +214,26 @@ def card_approach(item: DigestItem) -> str | None:
 
 
 def card_reason(item: DigestItem) -> str | None:
-    """«Почему ты»: буллеты из structured explain или проза (legacy)."""
-    _, why = parse_explain(item.reason)
-    if why:
-        return why
+    parts = parse_explain(item.reason)
+    if parts.why:
+        return parts.why
     limit = REASON_LIMIT_PITCH if item.opp_type == "talk" else REASON_LIMIT
     return reason_snippet(item.reason, limit=limit)
 
 
+def card_company(item: DigestItem) -> str | None:
+    if item.opp_type == "talk":
+        return None
+    return parse_explain(item.reason).company
+
+
+def card_product(item: DigestItem) -> str | None:
+    if item.opp_type == "talk":
+        return None
+    return parse_explain(item.reason).product
+
+
 def card_title(item: DigestItem) -> tuple[str, str | None]:
-    """Заголовок и работодатель после нормализации (для job — чистим мусор в title)."""
     org = item.org
     title = item.title
     if item.opp_type != "talk":
@@ -175,10 +243,9 @@ def card_title(item: DigestItem) -> tuple[str, str | None]:
 
 
 def card_summary(item: DigestItem, *, title: str | None = None) -> str | None:
-    """«Суть» для job: сначала СУТЬ из explain, иначе короткий snippet описания."""
     if item.opp_type == "talk":
         return None
-    essence, _ = parse_explain(item.reason)
+    essence = parse_explain(item.reason).essence
     if essence and len(essence) >= 12:
         return essence
     raw = item.description
@@ -192,7 +259,7 @@ def card_summary(item: DigestItem, *, title: str | None = None) -> str | None:
 
 
 def card_detail(item: DigestItem, *, title: str | None = None) -> str | None:
-    """Подробнее вакансии для хвоста expandable (не дублирует Суть)."""
+    """Текст источника для expandable-цитаты (не дублирует Суть)."""
     if item.opp_type == "talk":
         return None
     headline = title or card_title(item)[0]
@@ -211,7 +278,6 @@ def card_detail(item: DigestItem, *, title: str | None = None) -> str | None:
     if len(clean) < 60:
         return None
     essence = card_summary(item, title=headline)
-    # не повторять ту же фразу, что уже в Сути
     if essence and clean.lower().startswith(essence.lower()[:40]):
         rest = clean[len(essence) :].lstrip(" .,—–-")
         if len(rest) >= 60:
@@ -258,7 +324,6 @@ _CAREER_NAMES: dict[str, str] = {
 
 
 def format_source_label(source: str | None) -> str | None:
-    """Человекочитаемый источник (на карточке не акцентируем)."""
     if not source:
         return None
     key = source.strip()
