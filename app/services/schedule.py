@@ -44,6 +44,7 @@ DEFAULT_SCHEDULE: dict[str, Any] = {
     "quiet_hours": {"start": 23, "end": 8},
     "watch_daily_limit": 10,
     "watch_batch_limit": 3,
+    "digest_limit": 3,
     "jobs": {"enabled": True, "days": list(_WEEKDAYS), "hour": 9, "minute": 0},
     "talks": {"enabled": True, "days": [2], "hour": 17, "minute": 0},
 }
@@ -87,9 +88,14 @@ def normalize_schedule(raw: dict | None) -> dict[str, Any]:
     except (TypeError, ValueError):
         base["watch_daily_limit"] = 10
     try:
-        base["watch_batch_limit"] = max(1, min(10, int(raw.get("watch_batch_limit", 3))))
+        digest_limit = int(
+            raw.get("digest_limit", raw.get("watch_batch_limit", base["digest_limit"]))
+        )
+        base["digest_limit"] = max(1, min(10, digest_limit))
     except (TypeError, ValueError):
-        base["watch_batch_limit"] = 3
+        base["digest_limit"] = 3
+    # Один пользовательский лимит → и интерактив, и watch-пачка.
+    base["watch_batch_limit"] = base["digest_limit"]
 
     for ch in ("jobs", "talks"):
         src = raw.get(ch) if isinstance(raw.get(ch), dict) else {}
@@ -259,7 +265,7 @@ def format_schedule(schedule: dict | None) -> str:
         )
         lines.append(
             f"Лимит: до {s['watch_daily_limit']} карточек/день "
-            f"(пачка до {s['watch_batch_limit']})"
+            f"(за раз до {s['digest_limit']})"
         )
     else:
         lines.append("Доставка: по расписанию")
@@ -287,6 +293,7 @@ def format_schedule(schedule: dict | None) -> str:
             "• выступления среда 17:00",
             "• режим свежие / режим релевантные",
             "• тихие часы 23:00-8:00",
+            "• по 3 карточки / лимит 5",
             "• выступления выкл",
         ]
     )
@@ -339,7 +346,23 @@ def _parse_global_delivery(raw: str, sched: dict[str, Any]) -> dict[str, Any] | 
             sched["rank_mode"] = "fresh_relevant"
             return sched
 
+    m_lim = re.search(
+        r"(?:лимит|пачк[аиу]|по)\s*(\d{1,2})\s*(?:карточек|вакансий)?",
+        raw,
+    )
+    if not m_lim:
+        m_lim = re.search(r"(\d{1,2})\s*карточек", raw)
+    if m_lim:
+        sched["digest_limit"] = max(1, min(10, int(m_lim.group(1))))
+        return sched
+
     return None
+
+
+def digest_limit_for(profile: object | None) -> int:
+    """Сколько карточек за раз (Sprint A)."""
+    raw = getattr(profile, "digest_schedule", None) if profile is not None else None
+    return int(normalize_schedule(raw)["digest_limit"])
 
 
 def parse_schedule_command(text: str, current: dict | None = None) -> dict[str, Any] | None:

@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -65,17 +66,10 @@ _ASK_PROFILE_LINK = (
 )
 
 _DONE_TEXT = (
-    "Готово — профиль собран. Дальше ищу сам по твоему приоритету. 🎯\n\n"
-    "Меню внизу зависит от выбора «Работа / Выступления / Оба».\n"
-    "Команды всегда доступны:\n"
-    "/profile — что я о тебе знаю\n"
-    "/today — вакансии\n"
-    "/pitch — СМИ и подкасты\n"
-    "/talks — конференции с датой подачи\n"
-    "/schedule — когда присылать\n"
-    "/saved — избранное\n\n"
-    "Можно докинуть ссылки (сайт, LinkedIn) в любой момент.\n"
-    "Онбординг заново — напиши «начать заново»."
+    "Готово — профиль собран. Сейчас принесу свежие вакансии. 🎯\n\n"
+    "Команды: /today · /profile · /schedule · /saved\n"
+    "Ссылки можно докинуть в любой момент.\n"
+    "Онбординг заново — «начать заново»."
 )
 
 
@@ -85,12 +79,54 @@ class AgentReply:
     finished: bool = False
     buttons: tuple[str, ...] = ()
     remove_keyboard: bool = False
+    trigger_digest: bool = False  # Sprint A: после онбординга сразу /today
+    entry: str | None = None  # cv|text|link для analytics
 
 
-def _reply_for_step(step_idx: int, preface: str | None = None) -> AgentReply:
+def _reply_for_step(
+    step_idx: int, preface: str | None = None, *, profile: Profile | None = None
+) -> AgentReply:
     step = STEPS[step_idx]
-    text = f"{preface}\n\n{step.question}" if preface else step.question
+    question = step.question
+    if step.key == "confirm_roles" and profile is not None:
+        roles = ", ".join(profile.roles or []) or "пока пусто"
+        question = (
+            f"Так вижу целевые роли: {roles}.\n"
+            "Ок — или напиши 1–2 роли своими словами."
+        )
+    text = f"{preface}\n\n{question}" if preface else question
     return AgentReply(text=text, buttons=step.buttons)
+
+
+_SENIORITY_RE = re.compile(
+    r"\b(middle|senior|lead|head|cpo|c-level|директор|мидл|сеньор)\b",
+    re.I,
+)
+
+
+def roles_need_level(roles: list[str] | None) -> bool:
+    """True если в ролях нет явного грейда — спросим шаг level."""
+    blob = " ".join(roles or [])
+    if not blob.strip():
+        return True
+    return _SENIORITY_RE.search(blob) is None
+
+
+def apply_level_to_roles(roles: list[str] | None, level: str) -> list[str]:
+    """Префикс уровня к ролям, если его ещё нет."""
+    label = (level or "").strip()
+    base = [r for r in (roles or []) if r and str(r).strip()]
+    if not label:
+        return base
+    if not base:
+        return [label]
+    out: list[str] = []
+    for r in base:
+        if _SENIORITY_RE.search(r) or label.lower() in r.lower():
+            out.append(r)
+        else:
+            out.append(f"{label} {r}")
+    return out
 
 
 def _has_salary(profile: Profile) -> bool:
@@ -101,6 +137,8 @@ def _has_salary(profile: Profile) -> bool:
 def _should_skip_step(profile: Profile, step_key: str) -> bool:
     if step_key == "salary":
         return _has_salary(profile)
+    if step_key == "level":
+        return not roles_need_level(profile.roles)
     return False
 
 
@@ -113,6 +151,8 @@ def _skip_ahead(profile: Profile, start_idx: int, notes: list[str]) -> int:
             amount = int(sal.get("min") or 0)
             currency = sal.get("currency") or "RUB"
             notes.append(f"Зарплатный минимум взял из резюме: от {amount} {currency}.")
+        elif STEPS[idx].key == "level":
+            notes.append("Уровень ролей уже виден из резюме — шаг пропускаю.")
         idx += 1
     return idx
 
@@ -156,7 +196,9 @@ async def start_onboarding(session: AsyncSession, profile: Profile) -> AgentRepl
             profile_id=profile.id,
             props={"final": True},
         )
-        return AgentReply(text=_DONE_TEXT, finished=True, remove_keyboard=True)
+        return AgentReply(
+            text=_DONE_TEXT, finished=True, remove_keyboard=True, trigger_digest=True
+        )
     preface = "\n\n".join(notes) if notes else None
     await analytics.emit(
         session,
@@ -164,7 +206,7 @@ async def start_onboarding(session: AsyncSession, profile: Profile) -> AgentRepl
         profile_id=profile.id,
         props={"step": step_idx, "key": STEPS[step_idx].key},
     )
-    return _reply_for_step(step_idx, preface=preface)
+    return _reply_for_step(step_idx, preface=preface, profile=profile)
 
 
 async def continue_onboarding(session: AsyncSession, profile: Profile) -> AgentReply:
@@ -172,12 +214,16 @@ async def continue_onboarding(session: AsyncSession, profile: Profile) -> AgentR
     from app.services import analytics
 
     if is_onboarding_complete(profile):
-        return AgentReply(text=_DONE_TEXT, finished=True, remove_keyboard=True)
+        return AgentReply(
+            text=_DONE_TEXT, finished=True, remove_keyboard=True, trigger_digest=True
+        )
     notes: list[str] = []
     idx = _skip_ahead(profile, profile.onboarding_step, notes)
     profile.onboarding_step = idx
     if idx >= len(STEPS):
-        return AgentReply(text=_DONE_TEXT, finished=True, remove_keyboard=True)
+        return AgentReply(
+            text=_DONE_TEXT, finished=True, remove_keyboard=True, trigger_digest=True
+        )
     preface = "\n\n".join(notes) if notes else None
     await analytics.emit(
         session,
@@ -185,7 +231,7 @@ async def continue_onboarding(session: AsyncSession, profile: Profile) -> AgentR
         profile_id=profile.id,
         props={"step": idx, "key": STEPS[idx].key},
     )
-    return _reply_for_step(idx, preface=preface)
+    return _reply_for_step(idx, preface=preface, profile=profile)
 
 
 async def _run_enrichment(session: AsyncSession, profile: Profile) -> str | None:
@@ -284,7 +330,11 @@ async def _advance_onboarding(
     if not parsed.ok:
         return AgentReply(text=step.hint, buttons=step.buttons)
 
-    patch = parsed.patch
+    patch = dict(parsed.patch)
+    level = patch.pop("_level", None)
+    if level:
+        patch["roles"] = apply_level_to_roles(profile.roles, str(level))
+
     if patch:
         # На шаге согласия — замена ссылок (не мержим со старым LinkedIn).
         # На остальных шагах source_links в патче не ожидаем.
@@ -333,7 +383,7 @@ async def _advance_onboarding(
             props={"step": next_idx, "key": STEPS[next_idx].key},
         )
         preface = "\n\n".join(preface_parts) if preface_parts else None
-        return _reply_for_step(next_idx, preface=preface)
+        return _reply_for_step(next_idx, preface=preface, profile=profile)
 
     profile_service.refresh_readiness(profile)
     await session.flush()
@@ -344,7 +394,7 @@ async def _advance_onboarding(
         props={"final": True},
     )
     if profile.ready_for_matching:
-        return AgentReply(text=_DONE_TEXT, finished=True)
+        return AgentReply(text=_DONE_TEXT, finished=True, trigger_digest=True)
     missing = _missing_required(profile)
     return AgentReply(
         text=(
@@ -375,10 +425,96 @@ def _missing_required(profile: Profile) -> list[str]:
 
 async def handle_message(session: AsyncSession, user: User, text: str) -> AgentReply:
     """Точка входа: онбординг, если не завершён, иначе — свободный диалог."""
+    from app.services import analytics
+
     profile = await profile_service.get_profile(session, user.id)
     if profile is None:
+        from app.domain.profile import ProfileDraft
+        from app.services import bootstrap as bootstrap_service
+
+        useful, _junk = filter_useful_links(extract_urls(text))
+        if useful:
+            draft = ProfileDraft(
+                roles=["Product Manager"],
+                skills=[],
+                location="не указано",
+                work_mode="remote",
+            )
+            profile = await profile_service.apply_cv_draft(session, user.id, draft)
+            await profile_service.update_profile(
+                session,
+                profile,
+                {"enrichment_consent": True, "source_links": {"links": useful}},
+            )
+            await analytics.emit(
+                session,
+                name="entry_chosen",
+                profile_id=profile.id,
+                props={"entry": "link"},
+            )
+            summary = await _run_enrichment(session, profile)
+            reply = await start_onboarding(session, profile)
+            preface = summary or "Ссылки сохранил — уточним профиль."
+            return AgentReply(
+                text=f"{preface}\n\n{reply.text}",
+                buttons=reply.buttons,
+                finished=reply.finished,
+                remove_keyboard=reply.remove_keyboard,
+                trigger_digest=reply.trigger_digest,
+            )
+
+        if bootstrap_service.text_looks_like_profile_seed(text):
+            try:
+                draft = await bootstrap_service.draft_from_text(text)
+            except Exception as exc:  # noqa: BLE001
+                from app.observability.logging import get_logger
+
+                get_logger("kabi.dialogue").warning("bootstrap_text_failed: %s", exc)
+                return AgentReply(
+                    text=(
+                        "Не разобрал текст. Пришли PDF/DOCX резюме или напиши яснее:\n"
+                        "роли, опыт, куда целишься."
+                    )
+                )
+            profile = await profile_service.apply_cv_draft(session, user.id, draft)
+            await analytics.emit(
+                session,
+                name="entry_chosen",
+                profile_id=profile.id,
+                props={"entry": "text", "roles_n": len(profile.roles or [])},
+            )
+            reply = await start_onboarding(session, profile)
+            return AgentReply(
+                text=f"Собрал черновик из текста.\n\n{reply.text}",
+                buttons=reply.buttons,
+                finished=reply.finished,
+                remove_keyboard=reply.remove_keyboard,
+                trigger_digest=reply.trigger_digest,
+            )
+
+        low = text.strip().lower()
+        if low in {"2", "текст", "text", "2)", "вариант 2"}:
+            return AgentReply(
+                text=(
+                    "Ок, напиши пару предложений своими словами:\n"
+                    "роли, опыт, куда целишься.\n"
+                    "Например: «Product owner в банке, 5 лет, ищу Head of Product»."
+                )
+            )
+        if low in {"1", "pdf", "docx", "резюме", "1)"}:
+            return AgentReply(text="Пришли файл резюме PDF или DOCX.")
+        if low in {"3", "ссылка", "3)", "linkedin", "hh"}:
+            return AgentReply(
+                text="Пришли ссылку на HH или LinkedIn (/in/…)."
+            )
+
         return AgentReply(
-            text="Пришли, пожалуйста, своё резюме (PDF или DOCX) — начнём с него."
+            text=(
+                "Начнём с профиля. Можно так:\n"
+                "1) резюме PDF/DOCX\n"
+                "2) текст: роли и опыт парой предложений\n"
+                "3) ссылка на HH / LinkedIn /in/…"
+            )
         )
 
     if is_restart_request(text):

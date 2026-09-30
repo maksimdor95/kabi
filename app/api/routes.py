@@ -28,14 +28,20 @@ from app.services import cards
 from app.services import digest as digest_service
 from app.services import drafts as drafts_service
 from app.services import feedback as feedback_service
+from app.services import schedule as schedule_service
 from app.services.digest import DigestItem
 from app.services.onboarding import STEPS
 
 router = APIRouter(prefix="/api/v1")
 logger = get_logger("kabi.api")
 
-_FEED_LIMIT_DEFAULT = 12
 _FEED_LIMIT_MAX = 30
+
+
+def _feed_limit(actor: Actor, requested: int | None) -> int:
+    if requested is not None:
+        return max(1, min(_FEED_LIMIT_MAX, requested))
+    return schedule_service.digest_limit_for(actor.owned_profile)
 
 
 def _card(item: DigestItem, *, saved: bool = False) -> CardOut:
@@ -167,23 +173,27 @@ async def _build_feed(
 @router.get("/feed", response_model=FeedOut)
 async def get_feed(
     scope: Scope = Query("jobs"),
-    limit: int = Query(_FEED_LIMIT_DEFAULT, ge=1, le=_FEED_LIMIT_MAX),
+    limit: int | None = Query(None, ge=1, le=_FEED_LIMIT_MAX),
     actor: Actor = Depends(current_profile),
     session: AsyncSession = Depends(db_session),
 ) -> FeedOut:
     """Подборка из уже собранных данных: открытие приложения должно быть мгновенным."""
-    return await _build_feed(session, actor, scope=scope, limit=limit, do_ingest=False)
+    return await _build_feed(
+        session, actor, scope=scope, limit=_feed_limit(actor, limit), do_ingest=False
+    )
 
 
 @router.post("/feed/refresh", response_model=FeedOut)
 async def refresh_feed(
     scope: Scope = Query("jobs"),
-    limit: int = Query(_FEED_LIMIT_DEFAULT, ge=1, le=_FEED_LIMIT_MAX),
+    limit: int | None = Query(None, ge=1, le=_FEED_LIMIT_MAX),
     actor: Actor = Depends(rate_limit_expensive),
     session: AsyncSession = Depends(db_session),
 ) -> FeedOut:
     """То же, но со сходом в источники (долго — вызывается по кнопке)."""
-    return await _build_feed(session, actor, scope=scope, limit=limit, do_ingest=True)
+    return await _build_feed(
+        session, actor, scope=scope, limit=_feed_limit(actor, limit), do_ingest=True
+    )
 
 
 @router.get("/saved", response_model=list[CardOut])

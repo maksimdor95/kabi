@@ -27,13 +27,13 @@ logger = get_logger("kabi.bot.profile")
 
 BOT_COMMANDS = [
     BotCommand(command="start", description="Старт / статус"),
-    BotCommand(command="profile", description="Что менеджер знает о тебе"),
     BotCommand(command="today", description="Вакансии"),
-    BotCommand(command="pitch", description="СМИ и подкасты"),
-    BotCommand(command="talks", description="Конференции со сроком подачи"),
+    BotCommand(command="profile", description="Профиль"),
     BotCommand(command="saved", description="Избранное"),
-    BotCommand(command="schedule", description="Расписание рассылок"),
-    BotCommand(command="delete", description="Удалить профиль навсегда"),
+    BotCommand(command="schedule", description="Расписание и лимит карточек"),
+    BotCommand(command="pitch", description="СМИ и подкасты"),
+    BotCommand(command="talks", description="Конференции"),
+    BotCommand(command="delete", description="Удалить профиль"),
 ]
 
 

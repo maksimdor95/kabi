@@ -476,6 +476,17 @@ def test_default_connectors_include_m7bd():
     assert "geekjob.ru" in sources
 
 
+def test_fast_connectors_skip_slow_sources():
+    from app.ingestion.runner import fast_job_connectors
+
+    sources = [c.source for c in fast_job_connectors()]
+    assert "hh.ru" in sources
+    assert "superjob.ru" in sources
+    assert "getmatch.ru" not in sources
+    assert "career_sites" not in sources
+    assert "tg_jobs" not in sources
+
+
 def test_tg_http_proxy_reads_settings(monkeypatch):
     from app.ingestion.jobs import tg_proxy
 

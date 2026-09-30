@@ -43,8 +43,18 @@ class IngestionResult:
     skipped_existing: int
 
 
+def fast_job_connectors() -> list[JobConnector]:
+    """Интерактивный /today: быстрые API/листинги без TG и career scrape."""
+    return [
+        HHConnector(),
+        SuperJobConnector(),
+        HabrCareerConnector(),
+        GeekjobConnector(),
+    ]
+
+
 def default_job_connectors() -> list[JobConnector]:
-    """HH/SJ + M7: TG, career sites, Getmatch, Habr, Geekjob."""
+    """Полный прогон (scheduler): HH/SJ + M7 TG, career, Getmatch, Habr, Geekjob."""
     return [
         HHConnector(),
         SuperJobConnector(),
@@ -205,23 +215,38 @@ async def ingest_jobs_for_profile(
     profile: Profile,
     *,
     connectors: list[JobConnector] | None = None,
+    mode: str = "full",
 ) -> IngestionResult:
-    connectors = connectors or default_job_connectors()
+    """mode=fast — интерактив; full — scheduler / полный refresh."""
+    if connectors is None:
+        connectors = fast_job_connectors() if mode == "fast" else default_job_connectors()
     keywords = derive_keywords(profile)
     area = derive_hh_area(profile)
     if not keywords:
         logger.warning("У профиля нет ролей — нечего искать")
         return IngestionResult(fetched=0, saved=0, skipped_existing=0)
 
-    logger.info("Ингестия jobs: keywords=%s area=%s", keywords, area)
-    # Сохраняем после каждого коннектора: медленный TG/scrape не блокирует HH/SJ.
-    total = IngestionResult(fetched=0, saved=0, skipped_existing=0)
-    for connector in connectors:
+    logger.info(
+        "Ингестия jobs: mode=%s keywords=%s area=%s connectors=%d",
+        mode,
+        keywords,
+        area,
+        len(connectors),
+    )
+
+    async def _fetch_one(connector: JobConnector) -> tuple[str, list[OpportunityDraft]]:
         try:
             batch = await connector.fetch(keywords, area=area)
-        except Exception as exc:
+            return connector.source, batch or []
+        except Exception as exc:  # noqa: BLE001 — один коннектор не роняет runner
             logger.warning("Коннектор %s упал: %s", connector.source, exc)
-            continue
+            return connector.source, []
+
+    # HTTP параллельно; запись в БД — строго по очереди (одна AsyncSession).
+    fetched_batches = await asyncio.gather(*(_fetch_one(c) for c in connectors))
+
+    total = IngestionResult(fetched=0, saved=0, skipped_existing=0)
+    for source, batch in fetched_batches:
         if not batch:
             continue
         r = await _save_drafts(session, batch)
@@ -232,14 +257,15 @@ async def ingest_jobs_for_profile(
         )
         logger.info(
             "Ингестия %s: fetched=%d saved=%d skipped=%d",
-            connector.source,
+            source,
             r.fetched,
             r.saved,
             r.skipped_existing,
         )
 
     logger.info(
-        "Ингестия jobs: fetched=%d saved=%d skipped=%d",
+        "Ингестия jobs: mode=%s fetched=%d saved=%d skipped=%d",
+        mode,
         total.fetched,
         total.saved,
         total.skipped_existing,
@@ -303,10 +329,12 @@ async def ingest_for_profile(
     include_jobs: bool = True,
     include_talks: bool = True,
     live_cfp: bool = True,
+    jobs_mode: str = "full",
 ) -> IngestionResult:
-    """Полная ингестия под приоритеты профиля.
+    """Ингестия под приоритеты профиля.
 
     live_cfp=False — только seed без HTTP+LLM по страницам CFP (для /today).
+    jobs_mode=fast — без TG/career/getmatch (интерактивный /today).
     """
     prio = profile.priorities or "both"
     want_jobs = include_jobs and prio in ("job", "both")
@@ -314,7 +342,7 @@ async def ingest_for_profile(
 
     total = IngestionResult(fetched=0, saved=0, skipped_existing=0)
     if want_jobs:
-        r = await ingest_jobs_for_profile(session, profile)
+        r = await ingest_jobs_for_profile(session, profile, mode=jobs_mode)
         total = IngestionResult(
             fetched=total.fetched + r.fetched,
             saved=total.saved + r.saved,

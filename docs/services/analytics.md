@@ -20,6 +20,8 @@ async def emit(
     """Пишет product_events в той же транзакции. Никогда не роняет UX-путь."""
 
 EVENT_NAMES = {
+    "session_started",
+    "entry_chosen",
     "onboarding_step_entered",
     "onboarding_step_completed",
     "cv_uploaded",
@@ -33,11 +35,11 @@ EVENT_NAMES = {
 
 ## 4. Входы / Выходы
 - **Вход:** вызовы из `app/services/*` (и тонко из каналов для empty talks).
-- **Выход:** строки `product_events` → SQL/дашборд (P4).
+- **Выход:** строки `product_events` → `scripts/funnel_report.py` / SQL.
 
 ## 5. Зависимости
 - **Внутренние:** `app/db.models.ProductEvent`; вызывается из dialogue_agent,
-  profile, digest, feedback, drafts.
+  profile, digest, feedback, drafts, bot start/cv.
 - **Внешние:** —
 
 ## 6. Данные
@@ -51,10 +53,18 @@ EVENT_NAMES = {
 | props | jsonb | payload без PII/секретов |
 | created_at | timestamptz | |
 
-События и props:
+### Воронка (Sprint A)
+
+```
+session_started → entry_chosen(cv|text|link) → onboarding_step_* 
+  → onboarding_step_completed(final) → digest_shown → card_reacted
+                                                     ↘ empty_state
+```
 
 | name | props |
 |------|--------|
+| session_started | `{channel}` |
+| entry_chosen | `{entry: cv\|text\|link, roles_n?}` |
 | onboarding_step_entered | `{step, key}` |
 | onboarding_step_completed | `{step, key}` / `{final: true}` |
 | cv_uploaded | `{roles_n, skills_n}` |
@@ -65,6 +75,8 @@ EVENT_NAMES = {
 | empty_state | `{scope, channel}` |
 
 `link_tapped` — вне scope MVP (нужен redirect).
+
+Отчёт: `PYTHONPATH=. python scripts/funnel_report.py --env-file .env.staging`
 
 ## 7. Guardrails
 - Emit **в том же session** до commit; не отдельная транзакция.
@@ -80,7 +92,7 @@ EVENT_NAMES = {
 
 ## 9. Открытые вопросы
 - Нужен ли TTL/партиционирование таблицы на росте.
-- Дашборд SQL — P4.
+- UI-дашборд (Metabase / /internal) — после стабилизации воронки.
 
 ## 10. Статус
-`готово` (P1)
+`готово` (P1 + Sprint A funnel events)

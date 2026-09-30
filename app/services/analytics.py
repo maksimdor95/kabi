@@ -17,6 +17,8 @@ logger = get_logger("kabi.analytics")
 
 EVENT_NAMES = frozenset(
     {
+        "session_started",
+        "entry_chosen",
         "onboarding_step_entered",
         "onboarding_step_completed",
         "cv_uploaded",

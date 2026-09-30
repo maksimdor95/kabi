@@ -18,6 +18,7 @@ from app.services import digest as digest_service
 from app.services import drafts as drafts_service
 from app.services import feedback as feedback_service
 from app.services import profile as profile_service
+from app.services import schedule as schedule_service
 from app.services.onboarding import STEPS
 from bot.keyboards import (
     card_keyboard,
@@ -29,6 +30,7 @@ from bot.keyboards import (
 
 if TYPE_CHECKING:
     from app.db.models import Profile
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = Router(name="digest")
 logger = get_logger("kabi.bot.digest")
@@ -47,11 +49,57 @@ _REACTION_ACK = {
 }
 
 
+async def push_jobs_digest(
+    message: Message,
+    session: "AsyncSession",
+    profile: "Profile",
+    *,
+    intro: str | None = None,
+) -> int:
+    """Собрать и отправить jobs-подборку. Возвращает число карточек (Sprint A)."""
+    limit = schedule_service.digest_limit_for(profile)
+    await message.answer(
+        intro or "Собираю свежие вакансии…",
+        reply_markup=menu_for_profile(profile),
+    )
+    try:
+        items = await digest_service.build_digest(
+            session, profile, scope="jobs", limit=limit
+        )
+        await digest_service.deliver_feed(
+            session, profile, items, scope="jobs", channel="bot"
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("push_jobs_digest_failed")
+        await message.answer(
+            "Не смог собрать вакансии сейчас (часто лимит LLM). "
+            "Попробуй /today чуть позже — профиль уже готов."
+        )
+        return 0
+
+    if not items:
+        await message.answer(
+            "Подходящих вакансий пока не нашёл — мониторю дальше. "
+            "Можно /pitch или /talks, либо напиши «лимит 5» в /schedule."
+        )
+        return 0
+
+    await message.answer(f"Вакансии — {len(items)}:")
+    for item in items:
+        await message.answer(
+            format_card(item),
+            reply_markup=card_keyboard(item.match_id),
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
+    return len(items)
+
+
 async def _answer_not_ready(message: Message, profile: Profile | None) -> None:
     """Отказ без ложного «собираю…»: сразу что не хватает + текущий шаг."""
     if profile is None:
         await message.answer(
-            "Сначала загрузи резюме (PDF/DOCX) и пройди короткий онбординг 🙌",
+            "Сначала загрузи резюме (PDF/DOCX), текст с ролями или ссылку HH/LinkedIn.",
             reply_markup=remove_keyboard(),
         )
         return
@@ -59,9 +107,9 @@ async def _answer_not_ready(message: Message, profile: Profile | None) -> None:
     step_idx = profile.onboarding_step or 0
     if 0 <= step_idx < len(STEPS):
         step = STEPS[step_idx]
+        hint = step.hint or step.question.splitlines()[0]
         await message.answer(
-            "Профиль ещё не готов к подбору — допиши ответы в онбординге.\n\n"
-            + step.question,
+            f"Сначала допиши онбординг.\n{hint}",
             reply_markup=(
                 reply_keyboard(step.buttons) if step.buttons else remove_keyboard()
             ),
@@ -69,8 +117,7 @@ async def _answer_not_ready(message: Message, profile: Profile | None) -> None:
         return
 
     await message.answer(
-        "Профиль ещё не готов к подбору. Открой /profile — чего не хватает, "
-        "или допиши зарплату / красные флаги в чат.",
+        "Профиль ещё не готов к подбору. Открой /profile — чего не хватает.",
         reply_markup=menu_for_profile(profile),
     )
 
@@ -85,31 +132,8 @@ async def on_today(message: Message) -> None:
             await session.commit()
             await _answer_not_ready(message, profile)
             return
-        await message.answer(
-            "Собираю свежие вакансии… 🔎",
-            reply_markup=menu_for_profile(profile),
-        )
-        items = await digest_service.build_digest(session, profile, scope="jobs")
-        await digest_service.deliver_feed(
-            session, profile, items, scope="jobs", channel="bot"
-        )
+        await push_jobs_digest(message, session, profile)
         await session.commit()
-
-    if not items:
-        await message.answer(
-            "Свежих подходящих вакансий пока не нашёл. "
-            "СМИ/подкасты — /pitch, конференции — /talks."
-        )
-        return
-
-    await message.answer(f"Вакансии — {len(items)}:")
-    for item in items:
-        await message.answer(
-            format_card(item),
-            reply_markup=card_keyboard(item.match_id),
-            parse_mode="HTML",
-            disable_web_page_preview=True,
-        )
 
 
 @router.message(Command("pitch"))
@@ -123,12 +147,15 @@ async def on_pitch(message: Message) -> None:
             await session.commit()
             await _answer_not_ready(message, profile)
             return
+        limit = schedule_service.digest_limit_for(profile)
         await message.answer(
-            "Подбираю СМИ и подкасты… 🎙️",
+            "Подбираю СМИ и подкасты…",
             reply_markup=menu_for_profile(profile),
         )
-        await digest_service.build_digest(session, profile, scope="pitch")
-        items = await digest_service.list_pending(session, profile, scope="pitch", limit=7)
+        await digest_service.build_digest(session, profile, scope="pitch", limit=limit)
+        items = await digest_service.list_pending(
+            session, profile, scope="pitch", limit=limit
+        )
         await digest_service.deliver_feed(
             session, profile, items, scope="pitch", channel="bot"
         )
@@ -160,7 +187,7 @@ async def on_saved(message: Message) -> None:
         profile = await profile_service.get_profile(session, user.id)
         if profile is None:
             await session.commit()
-            await message.answer("Сначала загрузи резюме и пройди онбординг.")
+            await message.answer("Сначала собери профиль (PDF, текст или ссылка).")
             return
         items = await feedback_service.list_saved(session, profile, channel="bot")
         await session.commit()
@@ -195,9 +222,8 @@ async def on_talks(message: Message) -> None:
         profile = await profile_service.get_profile(session, user.id)
         if profile is None:
             await session.commit()
-            await message.answer("Сначала загрузи резюме и пройди онбординг.")
+            await message.answer("Сначала собери профиль (PDF, текст или ссылка).")
             return
-        # Без live HTTP по страницам заявок: данные уже в БД (seed + ночной scheduler).
         items = await deadlines_service.list_upcoming(session, within_days=60)
         if not items:
             from app.services import analytics
@@ -217,7 +243,6 @@ async def on_talks(message: Message) -> None:
     )
 
 
-# Алиас для меню / внутренних импортов.
 on_deadlines = on_talks
 
 

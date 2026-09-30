@@ -54,6 +54,7 @@ async def on_text(message: Message) -> None:
         reply = await dialogue_agent.handle_message(session, user, text)
         await session.commit()
         profile = await profile_service.get_profile(session, user.id)
+        trigger = reply.trigger_digest and profile is not None and profile.ready_for_matching
 
     if reply.finished:
         markup = menu_for_profile(profile)
@@ -64,3 +65,18 @@ async def on_text(message: Message) -> None:
     else:
         markup = None
     await message.answer(reply.text, reply_markup=markup)
+
+    if trigger:
+        from bot.handlers.digest import push_jobs_digest
+
+        async with get_session() as session:
+            user = await profile_service.get_or_create_user(session, message.from_user.id)
+            profile = await profile_service.get_profile(session, user.id)
+            if profile is not None and profile.ready_for_matching:
+                await push_jobs_digest(
+                    message,
+                    session,
+                    profile,
+                    intro="Профиль готов — собираю первые вакансии…",
+                )
+                await session.commit()

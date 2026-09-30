@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -26,6 +27,9 @@ from app.services import schedule as schedule_service
 from app.services.matching import MatchScope, RankMode
 
 logger = get_logger("kabi.digest")
+
+# Один тяжелый /today на профиль — не гоняем ingest дважды (auto + ручной).
+_digest_locks: dict[str, asyncio.Lock] = {}
 
 
 @dataclass
@@ -206,12 +210,69 @@ async def build_digest(
     limit: int = 7,
     rank_mode: RankMode | None = None,
     max_age_hours: float | None = None,
+    jobs_mode: str = "fast",
 ) -> list[DigestItem]:
-    """Собрать подборку: jobs / pitch / talks."""
+    """Собрать подборку: jobs / pitch / talks.
+
+    jobs_mode=fast (дефолт для бота): HH/SJ/Habr/Geekjob параллельно.
+    jobs_mode=full — scheduler, все коннекторы включая TG/career.
+    """
+    lock = _digest_locks.setdefault(str(profile.id), asyncio.Lock())
+    async with lock:
+        return await _build_digest_locked(
+            session,
+            profile,
+            scope=scope,
+            do_ingest=do_ingest,
+            include_talks=include_talks,
+            live_cfp=live_cfp,
+            limit=limit,
+            rank_mode=rank_mode,
+            max_age_hours=max_age_hours,
+            jobs_mode=jobs_mode,
+        )
+
+
+async def _build_digest_locked(
+    session: AsyncSession,
+    profile: Profile,
+    *,
+    scope: MatchScope,
+    do_ingest: bool,
+    include_talks: bool,
+    live_cfp: bool,
+    limit: int,
+    rank_mode: RankMode | None,
+    max_age_hours: float | None,
+    jobs_mode: str,
+) -> list[DigestItem]:
     if profile.embedding is None:
         await profile_service.compute_embedding(session, profile)
 
-    if do_ingest:
+    sched = schedule_service.normalize_schedule(profile.digest_schedule)
+    mode: RankMode = rank_mode or sched.get("rank_mode") or "fresh_relevant"  # type: ignore[assignment]
+    if mode not in ("fresh_relevant", "relevant"):
+        mode = "fresh_relevant"
+
+    need_ingest = do_ingest
+    if need_ingest and scope == "jobs":
+        preview = await matching.rank_candidates(
+            session,
+            profile,
+            limit=limit,
+            scope=scope,
+            rank_mode=mode,
+            max_age_hours=max_age_hours,
+        )
+        if len(preview) >= limit:
+            logger.info(
+                "ingest skip profile=%s: already %d candidates",
+                profile.id,
+                len(preview),
+            )
+            need_ingest = False
+
+    if need_ingest:
         talks = include_talks or scope in ("pitch", "talks")
         await ingest_for_profile(
             session,
@@ -219,12 +280,8 @@ async def build_digest(
             include_jobs=scope == "jobs",
             include_talks=talks,
             live_cfp=live_cfp,
+            jobs_mode=jobs_mode if scope == "jobs" else "full",
         )
-
-    sched = schedule_service.normalize_schedule(profile.digest_schedule)
-    mode: RankMode = rank_mode or sched.get("rank_mode") or "fresh_relevant"  # type: ignore[assignment]
-    if mode not in ("fresh_relevant", "relevant"):
-        mode = "fresh_relevant"
 
     new_matches = await matching.match(
         session,

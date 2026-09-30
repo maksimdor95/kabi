@@ -77,6 +77,34 @@ class Step:
 
 STEPS: list[Step] = [
     Step(
+        "confirm_roles",
+        "Так вижу целевые роли. Ок — или напиши 1–2 роли своими словами "
+        "(например: «Head of Product, CPO»).",
+        buttons=("Ок, роли верные",),
+        hint="Нажми «Ок, роли верные» или напиши роли через запятую.",
+    ),
+    Step(
+        "focus_aim",
+        "В каких сферах / компаниях хочешь работать?\n"
+        "Можно несколько областей или одной фразой своими словами.\n\n"
+        "Нажми кнопку ниже или напиши, например: «B2B logistics, не банки».",
+        buttons=(
+            "MedTech",
+            "Logistics",
+            "FinTech",
+            "E‑com",
+            "SaaS",
+            "Пока без фокуса",
+        ),
+        hint="Кнопка, свой текст или «Пока без фокуса».",
+    ),
+    Step(
+        "level",
+        "Какой уровень ролей целишь?",
+        buttons=("Middle", "Senior", "Lead / Head", "C-level"),
+        hint="Выбери кнопку или напиши уровень.",
+    ),
+    Step(
         "consent_links",
         "Если есть что-то ещё — присылай (одним сообщением или несколькими):\n"
         "• LinkedIn (/in/…)\n"
@@ -89,27 +117,25 @@ STEPS: list[Step] = [
     ),
     Step(
         "priorities",
-        "Что сейчас важнее — от этого зависит меню и что я мониторю сам:\n\n"
-        "• Работа — только вакансии (кнопка «Вакансии»)\n"
-        "• Выступления — СМИ/подкасты и конференции с дедлайном\n"
-        "• Оба — и вакансии, и выступления (в меню будет всё)\n\n"
-        "Выбери кнопку ниже. Потом можно сменить приоритет в /profile или написав в чат.",
+        "Что сейчас важнее — от этого зависит, что мониторю:\n\n"
+        "• Работа — только вакансии\n"
+        "• Выступления — СМИ/подкасты и конференции\n"
+        "• Оба — и вакансии, и выступления\n\n"
+        "Выбери кнопку. Потом можно сменить в /profile.",
         buttons=("Работа", "Выступления", "Оба"),
         hint="Выбери: Работа (вакансии), Выступления или Оба.",
     ),
     Step(
         "salary",
-        "От какой суммы предложение по работе тебе интересно? Укажи минимум (можно кнопкой).\n"
-        "Нужно, чтобы отсеять вакансии ниже этой вилки.",
+        "Минимум по зарплате — ниже не предлагаю. Сколько?",
         buttons=("от 300 000 ₽", "от 400 000 ₽", "от 500 000 ₽", "от 700 000 ₽"),
-        hint="Нужна сумма, например «500 000» или «500к». Или выбери кнопку.",
+        hint="Сумма, например «500 000» / «500к», или кнопка.",
     ),
     Step(
         "hard_nos",
-        "Куда точно НЕ предлагать? (индустрии, тип продукта, размер компании).\n"
-        "Это жёсткий фильтр в подборке — такие вакансии/площадки отбрасываю.",
+        "Куда точно не слать? Компании, индустрии, тип продукта — или «Нет красных флагов».",
         buttons=("Нет красных флагов",),
-        hint="Напиши, чего избегать, или нажми «Нет красных флагов».",
+        hint="Чего избегать, или «Нет красных флагов».",
     ),
 ]
 
@@ -218,6 +244,62 @@ def _parse_hard_nos(text: str) -> ParseResult:
     return ParseResult(ok=True, patch={"hard_nos": {"raw": text.strip()}})
 
 
+def _parse_confirm_roles(text: str) -> ParseResult:
+    t = text.strip().lower().replace("ё", "е")
+    if t in {
+        "ок",
+        "окей",
+        "да",
+        "верно",
+        "ок, роли верные",
+        "роли верные",
+        "все ок",
+        "всё ок",
+    } or t.startswith("ок,"):
+        return ParseResult(ok=True, patch={})  # роли не трогаем
+    raw = text.strip()
+    if len(raw) < 2:
+        return ParseResult(ok=False)
+    roles = [p.strip() for p in re.split(r"[,;\n]+", raw) if p.strip()]
+    if not roles:
+        return ParseResult(ok=False)
+    return ParseResult(ok=True, patch={"roles": roles[:8]})
+
+
+def _parse_focus_aim(text: str) -> ParseResult:
+    t = text.strip().lower().replace("ё", "е")
+    if t in {"пока без фокуса", "без фокуса", "не знаю", "пропустить"} or _is_negative(
+        text
+    ):
+        return ParseResult(ok=True, patch={"goals": None})
+    raw = text.strip()
+    if len(raw) < 2:
+        return ParseResult(ok=False)
+    return ParseResult(ok=True, patch={"goals": raw[:500]})
+
+
+def _parse_level(text: str) -> ParseResult:
+    t = text.strip().lower().replace("ё", "е")
+    mapping = (
+        ("c-level", "C-level"),
+        ("clevel", "C-level"),
+        ("cpo", "C-level"),
+        ("lead / head", "Lead"),
+        ("lead", "Lead"),
+        ("head", "Head"),
+        ("senior", "Senior"),
+        ("сеньор", "Senior"),
+        ("middle", "Middle"),
+        ("мидл", "Middle"),
+    )
+    for key, label in mapping:
+        if key in t:
+            return ParseResult(ok=True, patch={"_level": label})
+    if len(t) >= 3:
+        return ParseResult(ok=True, patch={"_level": text.strip()[:40]})
+    return ParseResult(ok=False)
+
+
 def _parse_availability(text: str) -> ParseResult:
     t = text.strip().lower()
     if not t:
@@ -268,6 +350,9 @@ def _parse_availability(text: str) -> ParseResult:
 
 
 _PARSERS: dict[str, Callable[[str], ParseResult]] = {
+    "confirm_roles": _parse_confirm_roles,
+    "focus_aim": _parse_focus_aim,
+    "level": _parse_level,
     "consent_links": _parse_consent_links,
     "priorities": _parse_priorities,
     "salary": _parse_salary,

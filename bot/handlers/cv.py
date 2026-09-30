@@ -64,6 +64,14 @@ async def on_document(message: Message, bot: Bot) -> None:
         profile = await profile_service.apply_cv_draft(
             session, user.id, draft, raw_cv_ref=str(dest)
         )
+        from app.services import analytics
+
+        await analytics.emit(
+            session,
+            name="entry_chosen",
+            profile_id=profile.id,
+            props={"entry": "cv", "roles_n": len(profile.roles or [])},
+        )
 
         if was_complete:
             extra = ""

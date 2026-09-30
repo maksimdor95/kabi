@@ -72,6 +72,7 @@ async def _send_channel(
                 live_cfp=live_cfp,
                 limit=limit,
                 max_age_hours=max_age,
+                jobs_mode="full",
             )
             await digest_service.deliver_feed(
                 session, prof, items, scope=scope, channel="scheduler"

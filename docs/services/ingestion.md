@@ -51,8 +51,11 @@ class JobConnector(Protocol):
   «отдельный продукт» тянет Python/QA).
 - **TG:** публичные каналы через `t.me/s/` без админ-прав.
   Короткий HTTP timeout (~8s): с части облаков `t.me` висит долго.
-- **Runner jobs:** сохранение после **каждого** коннектора — медленный scrape
-  не блокирует уже полученные HH/SJ (иначе `/today` пустой, пока TG таймаутит).
+- **Runner jobs:** fetch коннекторов **параллельно**, save — по очереди
+  (одна AsyncSession). Медленный TG не блокирует HTTP HH/SJ.
+- **Интерактивный /today:** `jobs_mode=fast` — HH + SuperJob + Habr + Geekjob
+  (без TG/career/getmatch). Полный набор — `jobs_mode=full` у scheduler.
+- Если в кэше уже ≥ limit кандидатов — ingest пропускаем.
 - **Карточка job:** `normalize_job_draft` перед save — чистый title/org без
   отсечения вакансий; страховка также в `format_card` для старых записей.
 
