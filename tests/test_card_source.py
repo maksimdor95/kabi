@@ -4,11 +4,30 @@ from app.services.digest import DigestItem
 from bot.keyboards import (
     MENU_DEADLINES,
     MENU_PITCH,
+    MENU_PROFILE,
+    MENU_SAVED,
     MENU_TODAY,
     format_card,
     format_source_label,
     main_menu_keyboard,
 )
+
+
+def test_parse_explain_structured():
+    from app.services.cards import parse_explain
+
+    essence, why = parse_explain(
+        "СУТЬ: доменные планы + контроль исполнения\n"
+        "ПОЧЕМУ:\n"
+        "· вход в B2B LLM без смены трека\n"
+        "- уровень ниже Head of Product — мост, не потолок\n"
+        "* вилки нет — сначала созвон"
+    )
+    assert essence == "доменные планы + контроль исполнения"
+    assert why is not None
+    assert why.startswith("· вход в B2B LLM")
+    assert why.count("\n") == 2
+    assert "· вилки нет" in why
 
 
 def test_source_labels():
@@ -21,7 +40,13 @@ def test_format_card_employer_and_snippet_no_source_accent():
     item = DigestItem(
         match_id="1",
         score=0.9,
-        reason="Подходит по роли CPO",
+        reason=(
+            "СУТЬ: roadmap и метрики роста marketplace-команды\n"
+            "ПОЧЕМУ:\n"
+            "· уровень Head of Product — шаг к целевому контуру\n"
+            "· marketplace-опыт из профиля цепляется к требованию\n"
+            "· вилка есть — можно сразу считать fit по деньгам"
+        ),
         title="Head of Product",
         org="Авито",
         location="Москва",
@@ -38,15 +63,18 @@ def test_format_card_employer_and_snippet_no_source_accent():
     text = format_card(item)
     assert "<b>🏢 Авито</b>" in text
     assert "💰 от 500 000 RUB" in text
+    assert "<blockquote expandable>" in text
     assert "<b>Суть:</b>" in text
-    assert "roadmap" in text
+    assert "roadmap и метрики" in text
     assert "Темы:" not in text
     assert "career_site" not in text
     assert "<b>Почему ты:</b>" in text
+    assert "· уровень Head of Product" in text
     assert "📡" not in text  # источник не акцентируем
 
 
-def test_format_card_truncates_with_ellipsis():
+def test_format_card_legacy_prose_still_works():
+    """Старые Match без СУТЬ/ПОЧЕМУ — суть из description, reason прозой."""
     long_desc = (
         "Проектировать сквозной пользовательский путь: от входа в раздел до перехода. "
         "Опыт работы Product Manager от 3 лет. "
@@ -73,13 +101,12 @@ def test_format_card_truncates_with_ellipsis():
         description="..." + long_desc,
     )
     text = format_card(item)
-    assert text.count("…") >= 1
-    assert "<b>Суть:</b> ..." not in text  # не начинаем с трёх точек
+    assert "<blockquote expandable>" in text
+    assert "<b>Суть:</b> ..." not in text
     assert "<b>Суть:</b> …" not in text
     assert "Проектировать" in text
-    why = text.split("<b>Почему ты:</b> ", 1)[1].split("\n\n", 1)[0]
-    assert why.endswith("…")
-    assert len(why) <= 230
+    assert "<b>Почему ты:</b>" in text
+    assert "Product Owner" in text
 
 
 def test_card_keyboard_draft_callback_and_favorites_label():
@@ -100,6 +127,7 @@ def test_card_keyboard_draft_callback_and_favorites_label():
 
 
 def test_menu_job_hides_talks():
+    # Sprint A: reply-меню укорочено — pitch/talks только командами.
     kb = main_menu_keyboard("job")
     labels = {btn.text for row in kb.keyboard for btn in row}
     assert MENU_TODAY in labels
@@ -107,15 +135,18 @@ def test_menu_job_hides_talks():
     assert MENU_DEADLINES not in labels
 
 
-def test_menu_talk_hides_jobs():
+def test_menu_talk_still_short():
     kb = main_menu_keyboard("talk")
     labels = {btn.text for row in kb.keyboard for btn in row}
-    assert MENU_TODAY not in labels
-    assert MENU_PITCH in labels
-    assert MENU_DEADLINES in labels
+    assert MENU_TODAY in labels
+    assert MENU_SAVED in labels
+    assert MENU_PROFILE in labels
+    assert MENU_PITCH not in labels
 
 
-def test_menu_both_has_all():
+def test_menu_both_short():
     kb = main_menu_keyboard("both")
     labels = {btn.text for row in kb.keyboard for btn in row}
-    assert {MENU_TODAY, MENU_PITCH, MENU_DEADLINES} <= labels
+    assert {MENU_TODAY, MENU_SAVED, MENU_PROFILE} <= labels
+    assert MENU_PITCH not in labels
+    assert MENU_DEADLINES not in labels

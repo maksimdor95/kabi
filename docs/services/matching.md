@@ -44,6 +44,18 @@ async def explain(profile: Profile, opp: Opportunity) -> str: ...
 (remote, зарплатный минимум, hard-nos), топ-N, LLM-объяснение (cheap tier),
 дедуп уже показанных `Match`. Объяснения считаются **параллельно** (`asyncio.gather`).
 
+`explain` для job пишет structured текст в `Match.reason`:
+```
+СУТЬ: <что делать на месте, не название роли>
+ПОЧЕМУ:
+· <ход: апсайд/мост/потолок>
+· <якорь из профиля>
+· <оговорка, если есть>
+```
+Запрещены чеклист-фразы («целевая роль», «совпадает с профилем/work_mode»).
+Карточка парсит это в `cards.parse_explain` → «Суть» + буллеты; в Telegram —
+`<blockquote expandable>`.
+
 Talks (M3+): дополнительно отсекаем `meta.status in {closed, watch}`, прошедший
 deadline и отсутствие пересечения тем (`speaking_topics`/`roles`/`skills` ∩ `meta.topics`).
 

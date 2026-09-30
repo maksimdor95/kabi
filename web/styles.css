@@ -219,6 +219,7 @@ body {
   border-radius: 0 10px 10px 0;
   padding: 8px 10px;
   font-size: 14px;
+  white-space: pre-line;
 }
 
 .card__link {

@@ -61,7 +61,8 @@ blocked_pitch_orgs(session, profile_id) -> set[str]  # cooldown + penalty
   «Черновик питча».
 - Org cooldown: та же `org` не в топе 30 дней после `shown_at`.
 - Org penalty: после 👎/🙈 по talk этой org — 90 дней вне топа.
-- «Почему ты» для talk: лимит 480 символов (2–3 предложения), не 220.
+- «Почему ты» для talk: structured буллеты или проза, лимит ~520 (как у job);
+  в Telegram — expandable quote, без обрезки на полуфразе.
 
 ## 8. Тесты / evals
 - Seed: `vc` имеет `pitch_url` ≠ homepage; `actionable=True` в meta.

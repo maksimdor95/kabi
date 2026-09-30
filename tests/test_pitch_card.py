@@ -49,12 +49,12 @@ def test_card_approach_from_how_to():
     assert cards.card_summary(item) is None  # talk — без «Сути»
 
 
-def test_pitch_reason_limit_higher_than_job():
-    long = "А" * 400
+def test_pitch_reason_limit_allows_long_bullets():
+    long = "· " + ("якорь опыта и ход " * 20)
     talk = DigestItem(
         match_id="1",
         score=1.0,
-        reason=long,
+        reason=f"ПОЧЕМУ:\n{long}\n· второй буллет\n· третий",
         title="t",
         org="o",
         location=None,
@@ -67,7 +67,10 @@ def test_pitch_reason_limit_higher_than_job():
     job = DigestItem(
         match_id="2",
         score=1.0,
-        reason=long,
+        reason=(
+            "СУТЬ: короткая суть задачи на месте\n"
+            f"ПОЧЕМУ:\n{long}\n· второй\n· третий"
+        ),
         title="t",
         org="o",
         location=None,
@@ -80,8 +83,9 @@ def test_pitch_reason_limit_higher_than_job():
     tr = cards.card_reason(talk)
     jr = cards.card_reason(job)
     assert tr and jr
-    assert len(tr) > len(jr)
-    assert len(tr) <= cards.REASON_LIMIT_PITCH + 5
+    assert tr.startswith("· ")
+    assert jr.startswith("· ")
+    assert cards.card_summary(job) == "короткая суть задачи на месте"
 
 
 def test_actionable_pitch_opp_reads_meta():

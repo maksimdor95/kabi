@@ -26,9 +26,10 @@ async def deliver_feed(session, profile, items, *, scope, channel) -> list[Diges
   `empty_state` (см. `docs/services/analytics.md`).
 
 Поля карточки (`app/services/cards.py`) — presentation-neutral и общие для всех
-каналов: `format_salary`, `card_title`, `card_summary`, `reason_snippet`,
-`format_source_label`. Разметку добавляет канал: HTML в `bot/keyboards`,
-JSON в `app/api`.
+каналов: `format_salary`, `card_title`, `card_summary`, `card_reason`,
+`parse_explain`, `format_source_label`. «Суть»/«Почему ты» из structured
+`Match.reason` (см. matching.md); legacy-проза — fallback. Разметку добавляет
+канал: HTML (`blockquote expandable`) в `bot/keyboards`, JSON в `app/api`.
 
 ## 4. Входы / Выходы
 - **Вход:** профиль + свежие `Match`.

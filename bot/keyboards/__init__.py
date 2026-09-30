@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from html import escape
+
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -82,22 +84,14 @@ def delete_confirm_keyboard() -> InlineKeyboardMarkup:
 
 
 def main_menu_keyboard(priorities: str | None = "both") -> ReplyKeyboardMarkup:
-    """Меню зависит от приоритета онбординга: job / talk / both."""
-    prio = (priorities or "both").lower()
-    rows: list[list[KeyboardButton]] = []
-    if prio == "job":
-        rows.append([KeyboardButton(text=MENU_TODAY), KeyboardButton(text=MENU_SAVED)])
-    elif prio == "talk":
-        rows.append(
-            [KeyboardButton(text=MENU_PITCH), KeyboardButton(text=MENU_DEADLINES)]
-        )
-        rows.append([KeyboardButton(text=MENU_SAVED)])
-    else:
-        rows.append([KeyboardButton(text=MENU_TODAY), KeyboardButton(text=MENU_PITCH)])
-        rows.append(
-            [KeyboardButton(text=MENU_DEADLINES), KeyboardButton(text=MENU_SAVED)]
-        )
-    rows.append([KeyboardButton(text=MENU_PROFILE)])
+    """Короткое меню (Sprint A): вакансии + избранное + профиль.
+
+    Pitch/talks — командами /pitch /talks, без дубля с Mini App.
+    """
+    rows: list[list[KeyboardButton]] = [
+        [KeyboardButton(text=MENU_TODAY), KeyboardButton(text=MENU_SAVED)],
+        [KeyboardButton(text=MENU_PROFILE)],
+    ]
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 
@@ -108,25 +102,25 @@ def menu_for_profile(profile: object | None) -> ReplyKeyboardMarkup:
 
 
 def format_card(item: DigestItem, *, show_source: bool = False) -> str:
-    """Карточка: job — суть/почему ты; talk/pitch — формат + как зайти + почему ты."""
+    """Карточка: шапка + expandable-цитата (Суть/Как зайти + Почему ты)."""
     is_talk = item.opp_type == "talk"
     badge = "🎤 " if is_talk else ""
     title, org = card_title(item)
 
-    lines = [f"<b>{badge}{title}</b>"]
+    lines = [f"<b>{badge}{escape(title)}</b>"]
 
     if org:
-        lines.append(f"<b>🏢 {org}</b>")
+        lines.append(f"<b>🏢 {escape(org)}</b>")
 
     if is_talk and item.how:
         from app.ingestion.talks.seed_connector import _HOW_LABEL
 
         how_s = _HOW_LABEL.get(item.how, item.how)
-        lines.append(f"Формат: {how_s}")
+        lines.append(f"Формат: {escape(str(how_s))}")
 
     salary = format_salary(item.salary)
     if salary:
-        lines.append(f"💰 {salary}")
+        lines.append(f"💰 {escape(salary)}")
 
     loc_bits = []
     if item.location:
@@ -134,35 +128,39 @@ def format_card(item: DigestItem, *, show_source: bool = False) -> str:
     if item.remote:
         loc_bits.append("удалённо")
     if loc_bits:
-        lines.append("📍 " + " · ".join(loc_bits))
+        lines.append("📍 " + " · ".join(escape(b) for b in loc_bits))
 
     if item.deadline:
         lines.append("⏰ Дедлайн: " + item.deadline.strftime("%d.%m.%Y"))
 
+    quote: list[str] = []
     if is_talk:
         approach = card_approach(item)
         if approach:
-            lines.append("")
-            lines.append(f"<b>Как зайти:</b> {approach}")
+            quote.append(f"<b>Как зайти:</b> {escape(approach)}")
     else:
         summary = card_summary(item, title=title)
         if summary:
-            lines.append("")
-            lines.append(f"<b>Суть:</b> {summary}")
+            quote.append(f"<b>Суть:</b> {escape(summary)}")
 
     reason = card_reason(item)
     if reason:
+        # буллеты многострочные — escape по строкам, переносы сохранить
+        reason_html = "\n".join(escape(line) for line in reason.splitlines())
+        quote.append(f"<b>Почему ты:</b>\n{reason_html}")
+
+    if quote:
         lines.append("")
-        lines.append(f"<b>Почему ты:</b> {reason}")
+        lines.append("<blockquote expandable>" + "\n\n".join(quote) + "</blockquote>")
 
     if show_source:
         src = format_source_label(item.source)
         if src:
-            lines.append(f"<i>{src}</i>")
+            lines.append(f"<i>{escape(src)}</i>")
 
     if item.url and item.link_label:
         lines.append("")
-        lines.append(f'<a href="{item.url}">{item.link_label}</a>')
+        lines.append(f'<a href="{escape(item.url, quote=True)}">{escape(item.link_label)}</a>')
 
     return "\n".join(lines)
 
